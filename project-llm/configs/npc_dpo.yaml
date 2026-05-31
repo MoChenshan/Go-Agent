@@ -1,0 +1,63 @@
+# =============================================================================
+# NPC DPO 偏好对齐（主线）
+# 前置：先完成 npc_sft.yaml 训练
+# 运行：llamafactory-cli train configs/npc_dpo.yaml
+# =============================================================================
+
+### 基于 SFT 后的模型继续 DPO
+model_name_or_path: Qwen/Qwen3-4B
+adapter_name_or_path: ./output/npc_sft  # 加载 SFT 的 LoRA 权重
+trust_remote_code: true
+
+### DPO 训练
+stage: dpo
+do_train: true
+finetuning_type: lora
+
+### 量化
+quantization_bit: 4
+quantization_method: bitsandbytes
+double_quantization: true
+quantization_type: nf4
+
+### LoRA（DPO 阶段用较小 rank）
+lora_rank: 16
+lora_alpha: 32
+lora_target: all
+lora_dropout: 0.05
+use_rslora: true
+
+### 数据
+dataset: npc_dpo
+dataset_dir: ./data
+template: qwen3
+cutoff_len: 2048
+max_samples: 3000
+
+### DPO 超参（2026 经验值）
+pref_beta: 0.1                   # KL 散度惩罚系数（原 dpo_beta）
+pref_loss: sigmoid               # sigmoid(DPO) / hinge / ipo / orpo / simpo
+# pref_loss: simpo               # SimPO 无需 ref model，显存减半，效果略优
+# simpo_gamma: 1.5
+
+### 训练超参
+num_train_epochs: 2
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4
+learning_rate: 5.0e-6            # DPO 学习率比 SFT 小一个数量级
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+
+### 优化
+optim: adamw_torch_fused
+flash_attn: fa2
+liger_kernel: true
+bf16: true
+
+### 日志与输出
+logging_steps: 10
+save_steps: 100
+save_total_limit: 2
+output_dir: ./output/npc_dpo
+overwrite_output_dir: true
+report_to: [tensorboard, swanlab]

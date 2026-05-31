@@ -1,0 +1,111 @@
+# =============================================================================
+# rag_docker-compose.yaml —— Agentic RAG 四件套一键编排
+#
+# 拓扑：
+#   Qdrant (6333) ← rag_serve (8100) ← mcp_expert (8200) ← project-agent
+#                              ↓
+#                      vLLM (8000)  [知识库专家模型]
+#
+# 使用：
+#   docker compose -f deploy/rag_docker-compose.yaml up -d
+#   docker compose -f deploy/rag_docker-compose.yaml logs -f rag_serve
+# =============================================================================
+version: "3.9"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    container_name: gameops-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"   # gRPC
+    volumes:
+      - ./output/qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  vllm_expert:
+    image: vllm/vllm-openai:v0.10.1.1
+    container_name: gameops-vllm-expert
+    runtime: nvidia
+    environment:
+      - HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./output/knowledge_merged:/models/knowledge-expert
+    ports:
+      - "8000:8000"
+    command: >
+      --model /models/knowledge-expert
+      --served-model-name qwen3-8b-knowledge-sft
+      --tensor-parallel-size 1
+      --max-model-len 32768
+      --quantization fp8
+      --enable-prefix-caching
+      --disable-log-requests
+      --port 8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  rag_serve:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.rag
+    container_name: gameops-rag-serve
+    environment:
+      - RAG_CONFIG=/app/configs/knowledge_rag.yaml
+      - QDRANT_URL=http://qdrant:6333
+      - LLM_BASE_URL=http://vllm_expert:8000/v1
+      - LLM_API_KEY=EMPTY
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+    volumes:
+      - ..:/app
+    working_dir: /app
+    command: >
+      uvicorn deploy.rag_serve:app
+      --host 0.0.0.0 --port 8100
+      --workers 2
+    ports:
+      - "8100:8100"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      vllm_expert:
+        condition: service_started
+    restart: unless-stopped
+
+  mcp_expert:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.rag
+    container_name: gameops-mcp-expert
+    environment:
+      - RAG_URL=http://rag_serve:8100
+    volumes:
+      - ..:/app
+    working_dir: /app
+    command: python deploy/mcp_expert_server.py --host 0.0.0.0 --port 8200
+    ports:
+      - "8200:8200"
+    depends_on:
+      - rag_serve
+    restart: unless-stopped
+
+networks:
+  default:
+    name: gameops-rag

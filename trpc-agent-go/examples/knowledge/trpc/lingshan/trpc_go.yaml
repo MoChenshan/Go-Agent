@@ -1,0 +1,11 @@
+global:
+  namespace: Development
+  env_name: test
+
+client:
+  service:
+    - name: trpc.test.knowledge.lingshan
+      # is devcloud environment URL here
+      target: dns://api.apigw.oa.com
+      protocol: http_no_protocol
+      timeout: 10000

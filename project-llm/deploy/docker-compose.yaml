@@ -1,0 +1,74 @@
+version: "3.9"
+
+# =============================================================================
+# project-llm 容器化部署栈
+# 启动：docker compose up -d
+# =============================================================================
+
+services:
+  # ---- 方向一：知识库模型 vLLM V1 服务 ----
+  knowledge-vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    environment:
+      - VLLM_USE_V1=1
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ./output/knowledge_fp8:/models/knowledge
+    command: >
+      --model /models/knowledge
+      --served-model-name knowledge-expert
+      --tensor-parallel-size 1
+      --enable-prefix-caching
+      --max-model-len 32768
+      --gpu-memory-utilization 0.90
+      --trust-remote-code
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ---- 方向二：NPC 模型 llama.cpp 服务 ----
+  npc-llamacpp:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    environment:
+      - GGML_AMX=1
+    volumes:
+      - ./output/npc_gguf:/models
+    command: >
+      --model /models/npc-4b-q4_k_m.gguf
+      --host 0.0.0.0 --port 8080
+      --threads 8 --ctx-size 8192
+      --parallel 4 --cont-batching --metrics --jinja
+    ports:
+      - "8080:8080"
+
+  # ---- 可观测性：Langfuse（可选）----
+  langfuse:
+    image: langfuse/langfuse:latest
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@langfuse-db:5432/langfuse
+      - NEXTAUTH_SECRET=please-change-me
+      - NEXTAUTH_URL=http://localhost:3000
+      - SALT=please-change-me
+    ports:
+      - "3000:3000"
+    depends_on:
+      - langfuse-db
+
+  langfuse-db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=langfuse
+    volumes:
+      - langfuse-pgdata:/var/lib/postgresql/data
+
+volumes:
+  langfuse-pgdata:

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "gongfeng": {
+      "url": "https://prod.mcp.it.woa.com/gongfeng/api/mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_GONGFENG_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

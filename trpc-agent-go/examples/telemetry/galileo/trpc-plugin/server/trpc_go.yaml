@@ -1,0 +1,53 @@
+global: # 全局配置
+  namespace: Development # 环境类型，分正式 Production 和非正式 Development 两种类型
+  env_name: pre # 环境名称，非正式环境下多环境的名称
+  container_name: pre.knocknock_test.short_token_proxy.gz100005 # 容器名称
+  local_ip: 11.151.226.17 # 本地 IP，容器内为容器 ip，物理机或虚拟机为本机 ip
+  admin_port: 19829 #管理命令服务端口
+  enable_set: N #是否启用set
+  full_set_name: #set名
+server:
+  app: knocknock_test # 业务的应用名
+  server: short_token_proxy # 进程服务名
+  service:                                          # business service configuration, can have multiple.
+    - name: trpc.app.app.agent                      # the route name of the service.
+      ip: 127.0.0.1                                 # the service listening ip address, can use the placeholder ${ip}, choose one of ip and nic, priority ip.
+      port: 8080                                    # the service listening port, can use the placeholder ${port}.
+      network: tcp                                  # the service listening network type.
+      protocol: http_no_protocol                    # the service application protocol.
+      timeout: 1000000                              # the service process timeout.
+plugins:
+  log:
+    default:
+      - writer: galileo       # 伽利略远程日志
+        level: debug           # 日志级别
+      - writer: console
+        level: info
+  telemetry:
+    galileo:
+      verbose: error # 用于诊断监控上报是否异常，输出到 trpc.log，取值范围[debug, info, error]，默认error
+      #ocp_addr: http://gocp.testsite.woa.com/ocp/api/v1/get_config
+      config: # 本地配置
+        opentelemetry_push:
+          enable: true
+          url: otlp.j.woa.com:80
+        traces_config: # Trace 配置
+          enable: true # 是否启用
+          processor: # 数据处理相关配置
+            sampler: # 采样器配置
+              fraction: 1 # 采样比例，默认 0.0001
+              error_fraction: 1 # 出现错误时的采样比例
+            disable_trace_body: false # 若为 true，则关闭 trace 中对 req 和 rsp 的上报，可以提高上报性能。默认 true。
+            enable_deferred_sample: true # 是否开启延迟采样，默认 false。
+            deferred_sample_error: true # 延迟采样 - 出错采样，默认 false。
+            deferred_sample_slow_duration_ms: 1000 # 延迟采样 - 慢操作采样，慢操作阈值，单位 ms，默认 1000。
+            disable_parent_sampling: false # 忽略上游的采样结果，默认 false。
+        metrics_config: # 指标配置
+          enable: true    # 是否启用指标
+        logs_config: # 日志配置
+          enable: true # 是否启用
+          processor: # 数据处理相关配置
+            level: DEBUG # 日志级别，取值范围： ERROR, INFO, DEBUG. 默认 ERROR, V0.2.5以前的版本，大小写敏感。
+        version: 1 # 版本号，默认 0，此版本号用于控制远程配置和本地配置的优先级，版本号高的优先，一般设置成 1 即可。
+      resource: # 资源信息，在 SDK 运行期间不会改变。resource 中的字段一般不需要配置，默认会填充。
+        platform: PCG-123 # 服务部署的平台，如 PCG-123, STKE, DevNet , 默认 PCG-123

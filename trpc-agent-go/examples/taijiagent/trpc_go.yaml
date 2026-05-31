@@ -1,0 +1,59 @@
+global:
+  namespace: Development
+  env_name: test
+  local_ip: 21.6.224.104
+  container_name: devcloud
+
+client:
+  timeout: 10
+  filter:
+    - galileo
+  stream_filter:
+    - galileo
+  service:
+    - name: trpc.test.taijiagent.taiji
+      # is devcloud environment URL here
+      target: ip://stream-server-online-openapi.turbotke.production.polaris:1081
+      protocol: http_no_protocol 
+      timeout: 10
+      network: tcp
+
+plugins:
+  log:
+    default:
+      - writer: galileo       
+        level: debug
+      - writer: console
+        level: info
+  telemetry:
+    galileo:
+      verbose: debug 
+      config: # 本地配置
+        access_point: 4
+        opentelemetry_push:
+          enable: true
+          url: otlp.j.woa.com:80
+        traces_config: # Trace 配置
+          enable: true # 是否启用
+          processor: # 数据处理相关配置
+            sampler: # 采样器配置
+              fraction: 1 # 采样比例，默认 0.0001
+              error_fraction: 1 # 出现错误时的采样比例
+            disable_trace_body: false # 若为 true，则关闭 trace 中对 req 和 rsp 的上报，可以提高上报性能。默认 true。
+            enable_deferred_sample: true # 是否开启延迟采样，默认 false。
+            deferred_sample_error: true # 延迟采样 - 出错采样，默认 false。
+            deferred_sample_slow_duration_ms: 1000 # 延迟采样 - 慢操作采样，慢操作阈值，单位 ms，默认 1000。
+            disable_parent_sampling: false # 忽略上游的采样结果，默认 false。
+        metrics_config: # 指标配置
+          enable: true    # 是否启用指标
+        logs_config: # 日志配置
+          enable: true # 是否启用
+          processor: # 数据处理相关配置
+            level: DEBUG # 日志级别，取值范围： ERROR, INFO, DEBUG. 默认 ERROR, V0.2.5以前的版本，大小写敏感。
+        version: 1 # 版本号，默认 0，此版本号用于控制远程配置和本地配置的优先级，版本号高的优先，一般设置成 1 即可。
+      resource: # 资源信息，在 SDK 运行期间不会改变。resource 中的字段一般不需要配置，默认会填充。
+          target: TKE.xxx.xxx
+          namespace: Development   # 环境类型，分正式 Production 和测试 Development 两种类型，如果不是这两个值，必须在这里正确配置。
+          env_name: test        # 环境名称，正式环境只能是 formal， 非正式环境下可以自定义
+          app: xxx          # 应用名
+          server: xxx     # 服务名

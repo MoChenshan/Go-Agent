@@ -1,0 +1,19 @@
+global:
+  namespace: development
+  env_name: test
+
+server:
+  service:
+    - name: trpc.openclaw.gateway
+      ip: 127.0.0.1
+      port: 18080
+      network: tcp
+      protocol: http_no_protocol
+      timeout: 60000
+
+plugins:
+  log:
+    default:
+      - writer: console
+        level: info
+        formatter: json

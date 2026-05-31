@@ -1,0 +1,20 @@
+global:
+  namespace: Development
+  env_name: test
+
+client:
+  service:
+    - name: trpc.test.knowledge.taiji
+      # is devcloud environment URL here
+      target: ip://stream-server-online-openapi.turbotke.production.polaris:1081
+      protocol: http_no_protocol
+      timeout: 0
+
+plugins:
+  registry:
+    polaris:
+      heartbeat_interval: 3000
+      protocol: grpc
+  selector:
+    polaris:
+      namespace: Development

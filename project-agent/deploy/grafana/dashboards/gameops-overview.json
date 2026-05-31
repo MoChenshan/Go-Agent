@@ -1,0 +1,150 @@
+{
+  "__comment": "GameOps Agent · 总览面板（D19.4 手工最小骨架）。可直接 Import 到 Grafana v9+。完整声明见 ../panels.yaml。",
+  "__source_of_truth": "指标名源自 src/observability/metrics.go 和 metrics_more.go；修改指标名时请同步更新本文件与 prometheus_rules.yaml。",
+  "schemaVersion": 39,
+  "title": "GameOps Agent · 总览",
+  "tags": ["gameops", "overview"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Webhook QPS（按来源）",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (rate(gameops_webhook_requests_total[1m]))",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Webhook outcome 分布（stacked）",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(gameops_webhook_requests_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "options": { "tooltip": { "mode": "multi" } },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "stacking": { "mode": "normal" } } }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "LLM 错误率",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(gameops_agent_llm_calls_total{status=\"error\"}[5m])) / ignoring(status) sum(rate(gameops_agent_llm_calls_total[5m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.02 },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "LLM 调用（按 agent × status）",
+      "gridPos": { "x": 6, "y": 8, "w": 18, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (agent, status) (rate(gameops_agent_llm_calls_total[1m]))",
+          "legendFormat": "{{agent}} / {{status}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "异步队列水位（submitted − finished）",
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "正值表示队列在累积，长期>0 触发 GameOpsAsyncQueueSaturated 告警",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome=\"accepted\"}[5m])) - ignoring(outcome) sum by (tool) (rate(gameops_async_jobs_finished_total[5m]))",
+          "legendFormat": "{{tool}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "异步终态分布（stacked）",
+      "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(gameops_async_jobs_finished_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "stacking": { "mode": "normal" } } }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "审计远端 dropped/failed（合规红线）",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "任一序列非零即触发 GameOpsAuditRemoteDropped 告警",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(gameops_audit_remote_dropped_total[5m]))",
+          "legendFormat": "dropped"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(gameops_audit_remote_failed_total[5m]))",
+          "legendFormat": "failed"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# 全仓库默认 reviewer
+*       @gameops-agent-maintainers
+
+# 安全敏感模块
+/src/audit/         @security-team @gameops-agent-maintainers
+/src/plugin/        @security-team @gameops-agent-maintainers
+/SECURITY.md        @security-team
+
+# 编排核心
+/src/agents/        @gameops-agent-maintainers
+/src/app/           @gameops-agent-maintainers
+
+# CI / 部署
+/.github/           @platform-team
+/deploy/            @platform-team
+/Dockerfile         @platform-team
+/docker-compose.yml @platform-team

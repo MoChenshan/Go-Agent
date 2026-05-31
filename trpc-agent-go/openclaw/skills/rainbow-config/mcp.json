@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "rainbow": {
+      "url": "https://mcpgw.knot.woa.com/rainbow",
+      "headers": {
+        "Authorization": "Bearer ${MCP_RAINBOW_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

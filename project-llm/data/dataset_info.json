@@ -1,0 +1,67 @@
+{
+    "_comment": "LLaMAFactory 数据集注册表。file_name 路径相对于本 dataset_info.json 所在目录。",
+
+    "knowledge_qa": {
+        "file_name": "processed/knowledge_qa.json",
+        "formatting": "alpaca",
+        "columns": {
+            "prompt": "instruction",
+            "query": "input",
+            "response": "output"
+        }
+    },
+
+    "knowledge_dpo": {
+        "file_name": "processed/knowledge_dpo.json",
+        "formatting": "sharegpt",
+        "ranking": true,
+        "columns": {
+            "messages": "conversations",
+            "chosen": "chosen",
+            "rejected": "rejected"
+        }
+    },
+
+    "npc_dialogues": {
+        "file_name": "processed/npc_dialogues.json",
+        "formatting": "sharegpt",
+        "columns": {
+            "messages": "conversations",
+            "system": "system"
+        },
+        "tags": {
+            "role_tag": "from",
+            "content_tag": "value",
+            "user_tag": "human",
+            "assistant_tag": "gpt",
+            "system_tag": "system"
+        }
+    },
+
+    "npc_dpo": {
+        "file_name": "processed/npc_dpo.json",
+        "formatting": "sharegpt",
+        "ranking": true,
+        "columns": {
+            "messages": "conversations",
+            "chosen": "chosen",
+            "rejected": "rejected",
+            "system": "system"
+        },
+        "tags": {
+            "role_tag": "from",
+            "content_tag": "value",
+            "user_tag": "human",
+            "assistant_tag": "gpt"
+        }
+    },
+
+    "npc_grpo_prompts": {
+        "_comment": "GRPO 仅需要 prompt 列作为 rollout 输入；npc_profiles/scenario_expected/expected_action 作为额外列传给 reward 函数。",
+        "file_name": "processed/npc_grpo_prompts.json",
+        "formatting": "alpaca",
+        "columns": {
+            "prompt": "prompt"
+        }
+    }
+}

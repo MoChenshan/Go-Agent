@@ -1,0 +1,23 @@
+# 忽略生成的图片文件
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.pdf
+
+# 忽略生成的数据文件
+*.csv
+*.txt
+
+# 忽略Python缓存文件
+__pycache__/
+*.pyc
+*.pyo
+
+# 忽略临时文件
+*.tmp
+*.temp
+
+# 忽略Mac系统文件
+.DS_Store

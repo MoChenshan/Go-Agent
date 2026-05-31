@@ -1,0 +1,30 @@
+global:
+  namespace: Development
+  env_name: test
+
+server:
+  app: test
+  server: promptiter
+  bin_path: /usr/local/trpc/bin/
+  conf_path: /usr/local/trpc/conf/
+  data_path: /usr/local/trpc/data/
+  service:
+    - name: trpc.test.promptiter.server
+      ip: 127.0.0.1
+      port: 8080
+      network: tcp
+      protocol: http_no_protocol
+
+plugins:
+  log:
+    default:
+      - writer: console
+        level: debug
+      - writer: file
+        level: info
+        writer_config:
+          filename: ./trpc.log
+          max_size: 10
+          max_backups: 10
+          max_age: 7
+          compress: false

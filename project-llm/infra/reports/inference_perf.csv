@@ -1,0 +1,9 @@
+backend,model,batch,seq_len,prefill_ms_p50,decode_tps_p50,total_tps_mean,gpu_mem_gb,note
+hf-eager,Qwen3-4B,1,1024,142.3,28.4,28.4,18.6,baseline
+hf-sdpa,Qwen3-4B,1,1024,98.1,41.7,41.7,18.6,sdpa attention
+hf-flash2,Qwen3-4B,1,1024,71.2,52.3,52.3,16.4,flash-attn 2
+vllm-v1,Qwen3-4B-fp16,16,1024,68.4,580.7,9292,18.9,continuous batching
+vllm-v1-awq,Qwen3-4B-AWQ,16,1024,52.3,612.4,9798,8.7,W4A16
+vllm-v1-fp8,Qwen3-4B-FP8,16,1024,49.8,640.1,10241,9.2,H100 only
+sglang,Qwen3-4B-AWQ,16,1024,55.2,602.3,9636,9.0,radix cache
+eagle3-vllm,Qwen3-4B+EAGLE3,16,1024,55.0,1480.6,23690,11.4,2.4x speedup

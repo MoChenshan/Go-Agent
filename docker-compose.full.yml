@@ -1,0 +1,170 @@
+# Go-Agent —— 顶层全栈 docker-compose
+#
+# 一条命令拉起：vLLM + RAG + 全套观测 + GameOps Agent + 必要中间件。
+# 用法：
+#   docker compose -f docker-compose.full.yml up -d
+#
+# 资源建议：>=16GB RAM；如无 GPU，请先在 vllm 服务的 deploy 段移除 reservations.devices。
+
+services:
+  # =================== 模型推理 ===================
+  vllm:
+    image: vllm/vllm-openai:v0.6.3
+    container_name: gago-vllm
+    command:
+      - --model=Qwen/Qwen3-4B
+      - --host=0.0.0.0
+      - --port=8000
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.85
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/v1/models || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  rag-server:
+    build:
+      context: project-llm
+      dockerfile: deploy/Dockerfile.rag
+    container_name: gago-rag
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - EMBED_MODEL=BAAI/bge-m3
+    ports:
+      - "8200:8200"
+    depends_on:
+      qdrant:
+        condition: service_started
+
+  qdrant:
+    image: qdrant/qdrant:v1.10.1
+    container_name: gago-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # =================== Agent 主服务 ===================
+  agent:
+    build:
+      context: project-agent
+      dockerfile: Dockerfile
+    container_name: gago-agent
+    environment:
+      - OPENAI_BASE_URL=http://vllm:8000/v1
+      - OPENAI_API_KEY=EMPTY
+      - MODEL_NAME=Qwen/Qwen3-4B
+      - RAG_URL=http://rag-server:8200
+      - REDIS_URL=redis://redis:6379/0
+      - OTEL_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - otel-collector
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  # =================== 中间件 ===================
+  redis:
+    image: redis:7-alpine
+    container_name: gago-redis
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gago-pg
+    environment:
+      - POSTGRES_PASSWORD=goagent
+      - POSTGRES_DB=langfuse
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  # =================== 观测栈 ===================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    container_name: gago-otel
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./project-agent/deploy/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    depends_on:
+      - jaeger
+      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: gago-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: gago-prom
+    volumes:
+      - ./project-agent/deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./project-agent/deploy/alerts/prometheus_rules.yaml:/etc/prometheus/rules/gameops.yaml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: gago-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./project-agent/deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: gago-langfuse
+    environment:
+      - DATABASE_URL=postgresql://postgres:goagent@postgres:5432/langfuse
+      - NEXTAUTH_SECRET=devsecret
+      - SALT=devsalt
+      - NEXTAUTH_URL=http://localhost:3001
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+
+  # =================== 零依赖 demo（无 GPU 也能跑）===================
+  demo-agent:
+    build:
+      context: project-agent
+      dockerfile: Dockerfile
+    container_name: gago-demo
+    command: ["/app/demo"]
+    ports:
+      - "8090:8090"
+
+volumes:
+  qdrant_data:
+  pg_data:

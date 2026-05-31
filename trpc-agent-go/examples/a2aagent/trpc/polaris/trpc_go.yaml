@@ -1,0 +1,31 @@
+global:
+  namespace: Development
+  env_name: test
+
+server:
+  service:
+    - name: trpc.app.agent.joker
+      ip: 0.0.0.0
+      port: 8088
+      network: tcp
+      protocol: http_no_protocol
+      timeout: 0
+
+client:
+  service:
+    - name: trpc.app.client.joker
+      target: polaris://trpc.agent.test.a2a
+      protocol: http 
+      timeout: 0
+
+plugins:
+  log:
+    default:
+      - writer: console
+        level: info
+  selector:
+    polaris:
+      protocol: grpc
+  registry:
+    polaris:
+      protocol: grpc

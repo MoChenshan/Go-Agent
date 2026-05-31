@@ -1,0 +1,43 @@
+app_name: "openclaw-a2a-main-agent"
+state_dir: ".trpc-agent-go/a2a-main-agent"
+
+debug_recorder:
+  enabled: false
+
+admin:
+  enabled: false
+
+a2a:
+  enabled: true
+  host: "http://127.0.0.1:18080/a2a"
+  streaming: true
+  advertise_tools: false
+  name: "openclaw-sandbox"
+  description: "Sandbox agent for bundled skills and local tooling."
+
+agent:
+  instruction: "You are a helpful sandbox assistant."
+  system_prompt: "You are tRPC-Claw."
+  persona: "concise"
+
+model:
+  mode: "openai"
+  name: "${OPENAI_MODEL}"
+  base_url: "${OPENAI_BASE_URL}"
+
+memory:
+  backend: "file"
+  auto:
+    enabled: false
+
+skills:
+  root: "./skills"
+  load_mode: "session"
+  allow_bundled:
+    - "weather"
+
+tools:
+  enable_local_exec: true
+  enable_openclaw_tools: true
+  enable_parallel_tools: true
+  refresh_toolsets_on_run: false

@@ -1,0 +1,64 @@
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# ============ 环境与密钥 ============
+.env
+.env.local
+*.key
+*.pem
+
+# ============ 模型权重（严禁入库）============
+output/
+*.safetensors
+*.bin
+*.gguf
+*.pte
+*.onnx
+*.tflite
+*.mlmodel
+*.dlc
+!output/.gitkeep
+
+# ============ 大数据集（原始）============
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/*/.gitkeep
+data/processed/*.json
+data/processed/*.jsonl
+!data/processed/.gitkeep
+!data/processed/README.md
+data/test/*.json
+!data/test/.gitkeep
+
+# ============ 训练日志 ============
+logs/
+wandb/
+swanlab-log/
+tensorboard/
+*.log
+
+# ============ IDE ============
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ============ 评估中间产物 ============
+eval/*.cache/
+eval/screenshots/
+
+# ============ llama.cpp / 临时 ============
+llama.cpp/
+*.tmp
+tmp/

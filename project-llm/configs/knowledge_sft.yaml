@@ -1,0 +1,69 @@
+# =============================================================================
+# 知识库专家模型 SFT 配置（Qwen3-8B + QLoRA + RSLoRA + Liger Kernel）
+# 适用：24GB 显卡（QLoRA 显存 ~9GB + KV + 梯度余量）
+# 运行：llamafactory-cli train configs/knowledge_sft.yaml
+# =============================================================================
+
+### 模型配置（2026 主流：Qwen3-8B，Apache 2.0，原生 thinking mode）
+model_name_or_path: Qwen/Qwen3-8B
+trust_remote_code: true
+
+### 微调方法
+stage: sft
+do_train: true
+finetuning_type: lora
+
+### QLoRA 量化配置（24GB 显卡必需）
+quantization_bit: 4
+quantization_method: bitsandbytes
+double_quantization: true        # 双重量化，再省 ~0.4bit
+quantization_type: nf4           # NF4 优于 FP4
+
+### LoRA 超参（2026 经验值）
+lora_rank: 16                    # 知识注入任务，rank 16 足够
+lora_alpha: 32                   # 通常设为 2 * rank
+lora_target: all                 # Qwen3 推荐 all 全模块注入（含 MLP）
+lora_dropout: 0.05
+use_rslora: true                 # Rank-Stabilized LoRA，训练更稳
+use_dora: false                  # DoRA 效果略好但训练慢 30%，按需开启
+
+### 数据配置
+dataset: knowledge_qa
+dataset_dir: ./data
+template: qwen3                  # Qwen3 专用模板（含 thinking block 处理）
+cutoff_len: 4096                 # Qwen3 原生 32K，运维 QA 取 4K 够用
+max_samples: 3000
+preprocessing_num_workers: 16
+neat_packing: true               # 2026 新特性：样本紧凑打包，吞吐量 +30%
+
+### 训练超参
+num_train_epochs: 3
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4   # 有效 batch = 16
+learning_rate: 1.0e-4            # Qwen3 建议比 Qwen2.5 略低
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+weight_decay: 0.01
+
+### Thinking Mode 处理
+enable_thinking: false           # 知识库 QA 默认关闭 thinking，保持答案简洁
+
+### 优化器与显存
+optim: adamw_torch_fused         # PyTorch 2.3+ fused Adam，速度 +10%
+flash_attn: fa2                  # FlashAttention-2（Hopper 可用 fa3）
+liger_kernel: true               # Liger Kernel 融合算子，显存 -20% / 速度 +15%
+
+### 日志和保存
+logging_steps: 10
+save_steps: 100
+save_total_limit: 3
+output_dir: ./output/knowledge_sft
+overwrite_output_dir: true
+report_to: [tensorboard, swanlab]
+bf16: true                       # BF16 优于 FP16，Qwen3 官方推荐
+
+### 验证
+val_size: 0.05
+per_device_eval_batch_size: 4
+eval_strategy: steps
+eval_steps: 100

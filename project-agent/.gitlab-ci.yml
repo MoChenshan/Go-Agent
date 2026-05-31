@@ -1,0 +1,196 @@
+# .gitlab-ci.yml — GameOps Agent CI 流水线（D30.2）
+#
+# # 定位
+#
+# 1. 每次 MR push 必跑：单元测试 + lint + golden 数据集静态校验
+# 2. Schedule / Manual trigger：运行 evalrun 离线评测，把 Judge 分数落盘为 JSON
+#    并通过 GitLab API comment 到 MR 上
+#
+# # 为什么 eval 不挂 MR push 而只挂 schedule / manual
+#
+# evalrun 会调用真实 LLM（hunyuan/OpenAI），每轮 ~10 分钟 + ~$0.5 开销。
+# 挂 every push 会让 MR 作者为跑飞的 prompt/LLM 抖动背锅——噪音 > 信号。
+# 策略：每夜自动跑一次（schedule）+ 作者按需手动触发（eval:on-demand）。
+#
+# # 分层
+#
+#   stage: build        —— Go vet / build / test（快，每 push 跑）
+#   stage: eval-offline —— evalrun + judge-json-out（慢，schedule / manual）
+#   stage: post-eval    —— 把 judge_report.json 解析成 MR 评论贴上去
+#
+# # 本地复现
+#
+#   cd project-agent
+#   go test -tags eval ./eval/...                                  # stage=build
+#   go run -tags eval ./eval/cmd/evalrun \
+#     --enable-llm-judge --judge-include-tool-selection \
+#     --judge-json-out=./eval/output/judge_report.json              # stage=eval-offline
+#   bash scripts/ci/comment-judge-summary.sh ./eval/output/judge_report.json  # stage=post-eval
+
+stages:
+  - build
+  - eval-offline
+  - post-eval
+
+default:
+  image: golang:1.24
+  tags:
+    - linux
+  before_script:
+    # GOPATH/GOCACHE 放到 cache path 下，让 go mod download 能跨 job 复用
+    - export GOPATH="$CI_PROJECT_DIR/.go"
+    - export GOCACHE="$CI_PROJECT_DIR/.gocache"
+    - export GOFLAGS="-mod=mod"
+    - cd project-agent
+    - go env GOPROXY
+
+# -----------------------------------------------------------------------------
+# 缓存策略：拉下来的 module 和 build cache 两份独立缓存，提高 eval-offline 启动速度
+# -----------------------------------------------------------------------------
+# 使用 extends: 而非 YAML merge key（<<:）—— extends 是 GitLab CI 原生机制，
+# 对所有 runner 版本兼容性最好；YAML 的 merge key 在部分 runner 上表现不一致。
+.go-cache:
+  cache:
+    key:
+      files:
+        - project-agent/go.sum
+    paths:
+      - .go/pkg/mod/
+      - .gocache/
+
+# =============================================================================
+# Stage 1: build —— 每次 push 必跑
+# =============================================================================
+
+unit-test:
+  stage: build
+  extends: .go-cache
+  script:
+    - go vet ./...
+    # 默认构建（不带 eval tag）跑业务主代码测试
+    - go test -count=1 -race -timeout 10m ./src/...
+    # 带 eval tag 跑 eval 包测试（金标数据集静态校验 + Judge 单测 + DTO 单测）
+    - go test -tags eval -count=1 -timeout 5m ./eval/...
+  artifacts:
+    when: always
+    paths:
+      - project-agent/coverage.out
+    expire_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+# 金标数据集 static check（工具名一致性、appName 校验）
+# 独立 job 方便 MR 评论里精准指出 "是数据集坏了" vs "是代码坏了"
+evalset-static-check:
+  stage: build
+  extends: .go-cache
+  script:
+    - go test -tags eval -run TestGolden -count=1 -v ./eval/...
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - project-agent/eval/data/**/*
+        - project-agent/eval/golden*.go
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
+# =============================================================================
+# Stage 2: eval-offline —— schedule / manual 触发
+# =============================================================================
+
+.eval-base:
+  stage: eval-offline
+  extends: .go-cache
+  variables:
+    # 所有 Judge 凭据都走 CI 变量（Settings → CI/CD → Variables → Masked + Protected）
+    OPENAI_BASE_URL: $JUDGE_OPENAI_BASE_URL
+    OPENAI_API_KEY: $JUDGE_OPENAI_API_KEY
+  artifacts:
+    when: always
+    name: "judge-report-$CI_PIPELINE_ID"
+    paths:
+      - project-agent/eval/output/
+    expire_in: 90 days
+    reports:
+      # 把 judge_report.json 暴露为 GitLab 可下载的 report artifact
+      # 后续 post-eval stage 能通过 needs:artifacts 直接拉取，不必重跑
+      dotenv: project-agent/eval/output/ci_env.txt
+
+# 每夜定时跑（需要在 GitLab Settings → CI/CD → Schedules 建一个）
+eval:nightly:
+  extends: .eval-base
+  script:
+    - mkdir -p ./eval/output
+    - |
+      go run -tags eval ./eval/cmd/evalrun \
+        --output-dir=./eval/output \
+        --enable-llm-judge \
+        --judge-model=hunyuan-turbo-s \
+        --judge-include-tool-selection \
+        --judge-json-out=./eval/output/judge_report.json \
+        --judge-fail-on-threshold=false
+    # 把关键信息写到 ci_env.txt，供下游 post-eval job 通过 dotenv 读取
+    - |
+      {
+        echo "JUDGE_REPORT_PATH=project-agent/eval/output/judge_report.json"
+        echo "PIPELINE_SOURCE=schedule"
+      } > ./eval/output/ci_env.txt
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $EVAL_NIGHTLY == "true"'
+
+# 手动触发：PR 作者觉得 prompt 改得比较狠，主动按一下
+# GitLab 界面 Pipeline → Play 按钮即可启动
+#
+# 注意：GitLab CI 的 rules 与顶层 when:manual 互斥——必须把 when 放进 rules 每条里。
+eval:on-demand:
+  extends: .eval-base
+  script:
+    - mkdir -p ./eval/output
+    - |
+      go run -tags eval ./eval/cmd/evalrun \
+        --output-dir=./eval/output \
+        --enable-llm-judge \
+        --judge-model=${JUDGE_MODEL:-hunyuan-turbo-s} \
+        --judge-include-tool-selection \
+        --judge-json-out=./eval/output/judge_report.json \
+        --judge-fail-on-threshold=false
+    - |
+      {
+        echo "JUDGE_REPORT_PATH=project-agent/eval/output/judge_report.json"
+        echo "PIPELINE_SOURCE=manual"
+        echo "MR_IID=${CI_MERGE_REQUEST_IID}"
+      } > ./eval/output/ci_env.txt
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
+
+# =============================================================================
+# Stage 3: post-eval —— 解析 JSON → GitLab API comment
+# =============================================================================
+
+eval:comment-mr:
+  stage: post-eval
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache bash jq curl
+  script:
+    - |
+      if [ -z "$MR_IID" ]; then
+        echo "非 MR 场景（如 nightly schedule），跳过 MR 评论"
+        exit 0
+      fi
+    - |
+      bash project-agent/scripts/ci/comment-judge-summary.sh \
+        project-agent/eval/output/judge_report.json \
+        "$CI_PROJECT_ID" "$MR_IID" "$GITLAB_TOKEN_COMMENT"
+  needs:
+    - job: eval:on-demand
+      artifacts: true
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: on_success
+  allow_failure: true

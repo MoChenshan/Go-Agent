@@ -1,0 +1,309 @@
+app_name: "openclaw"
+
+# 可选：状态目录。用于保存上传文件、debug 数据、托管 skills 等。
+state_dir: "~/.trpc-agent-go/openclaw"
+
+# 推荐：把模型配置写到 ~/.bashrc 之类的 shell 启动文件里。
+# 当前模板默认读取 OPENAI_* 环境变量。
+# 微信登录凭据不写进 YAML；启动后到 admin 的 Channels 页面里做
+# QR Login 即可。
+# 注意：YAML 里的 env 占位符如果没有对应环境变量，启动会直接报错。
+
+# 可选：debug recorder。
+debug_recorder:
+  enabled: true
+  dir: "${TRPC_CLAW_STATE_DIR}/debug"
+  mode: "full" # full | safe
+
+# 可选：上游 openclaw/app 直跑时使用的 HTTP 监听地址。
+# 当前这个 tRPC 分发版的实际监听地址和端口由 trpc_go.yaml 决定，
+# 所以这里通常不用配。
+# http:
+#   addr: ":8080"
+
+# 可选：admin surface。
+# 当前 cmd/openclaw 会单独启动 admin HTTP server，监听地址由这里决定。
+admin:
+  enabled: true
+  addr: "127.0.0.1:19789"
+  auto_port: true
+
+# 可选：Langfuse tracing。
+# LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY 由 exporter
+# 直接从进程环境读取；下面这些开关和 admin 链接也都可以用 env 覆盖。
+observability:
+  langfuse:
+    enabled: ${LANGFUSE_ENABLED:-true}
+    required: ${LANGFUSE_REQUIRED:-false}
+    ui_base_url: "${LANGFUSE_UI_BASE_URL:-}"
+    trace_url_template: "${LANGFUSE_TRACE_URL_TEMPLATE:-}"
+    observation_leaf_value_max_bytes: ${LANGFUSE_OBSERVATION_LEAF_VALUE_MAX_BYTES:-4096}
+
+# Agent 运行参数。
+# 这里默认启用了 GitHub trpc-agent-go README 里的基础人格设定：
+# "You are a helpful assistant."
+agent:
+  # 默认会从 state_dir/prompts/** 加载 instruction / system prompt
+  # 片段；这里的标量字段适合做额外的 inline 覆盖。
+  instruction: "You are a helpful assistant."
+  # system_prompt: ""
+  # off = 关闭 persona 文件注入。
+  persona: "pragmatic" # pragmatic | friendly | professional | concise | coach | creative | candid | quirky | nerdy | snarky | girlfriend | boyfriend | off
+  # persona_dir: "${TRPC_CLAW_STATE_DIR}/personas"
+  # type: "llm" # llm | claude-code
+  # 当前默认走 file-based memory：
+  # 优先注入工作区里最近的 AGENTS.md；如果没有，会回退到
+  # ~/.trpc-agent-go/AGENTS.md。用户级 MEMORY.md 也会自动注入。
+  add_session_summary: true
+  enable_context_compaction: true
+  context_compaction_oversized_tool_result_max_tokens: 8192
+  # max_history_runs: 0
+  preload_memory: 0
+  # instruction_files:
+  #   - "./prompts/instruction.md"
+  # 不写时默认读取 state_dir/prompts/instruction 下的片段。
+  # instruction_dir: "./prompts/instruction"
+  # system_prompt_files:
+  #   - "./prompts/system/runtime_identity.md"
+  # 不写时默认读取 state_dir/prompts/system 下的片段。
+  # system_prompt_dir: "./prompts/system"
+  # ralph_loop:
+  #   enabled: false
+  #   max_iterations: 0
+  #   completion_promise: "I have fully completed the task."
+  #   promise_tag_open: "<promise>"
+  #   promise_tag_close: "</promise>"
+  #   verify:
+  #     command: "go test ./..."
+  #     work_dir: "."
+  #     timeout: "5m"
+  #     env:
+  #       - "KEY=VALUE"
+  # claude_bin: "claude"
+  # claude_output_format: "stream-json"
+  # claude_extra_args:
+  #   - "--dangerously-skip-permissions"
+  # claude_env:
+  #   - "KEY=VALUE"
+  # claude_work_dir: "."
+
+model:
+  mode: "openai" # mock | openai
+  name: "${OPENAI_MODEL}"
+  base_url: "${OPENAI_BASE_URL}"
+  # api key comes from OPENAI_API_KEY.
+  # openai_variant: "auto" # auto | openai | deepseek | qwen | hunyuan
+  # generation_config:
+  #   # Stream defaults to true. Keep this on unless you explicitly want
+  #   # fully buffered replies.
+  #   stream: true
+  #   # max_tokens: 2048
+  #   # temperature: 0.7
+  # config:
+  #   any_model_plugin_specific_key: "any_model_plugin_specific_value"
+
+# 可选：Gateway 全局权限控制。
+# gateway:
+#   allow_users:
+#     - "replace-with-your-userid"
+#   require_mention: false
+#   mention_patterns:
+#     - "@OpenClaw"
+
+channels:
+  - type: "weixin"
+    name: "weixin-direct"
+    config:
+      # 可选：覆盖微信后端 API 地址。
+      base_url: "https://ilinkai.weixin.qq.com"
+      # 可选：long-poll 超时。
+      poll_timeout: "35s"
+      # 可选：拉取失败后的重试退避。
+      error_backoff: "30s"
+      # 建议先保持开启，便于感知“正在回复”状态。
+      enable_typing: true
+      # 允许用户在微信里直接发 /runtime status 等文本命令。
+      enable_runtime_commands: true
+      # 可选：覆盖微信 channel 自己的状态目录。
+      # 不写时会默认落到 "${TRPC_CLAW_STATE_DIR}/weixin"。
+      # state_dir: "${TRPC_CLAW_STATE_DIR}/weixin"
+      # 可选：用户白名单。
+      # allow_users:
+      #   - "user_a@im.wechat"
+
+# Skills 默认开启。
+# 安装脚本会把 GitHub 版默认 skills 同步到 state_dir/skills/bundled，
+# 你自己的 skills 建议放到 state_dir/skills/local。
+# 如果你有 Codex / skill hub 装下来的 skills，也会自动补到
+# ~/.codex/skills。
+skills:
+  root: "${TRPC_CLAW_STATE_DIR}/skills/bundled"
+  extra_dirs:
+    - "${TRPC_CLAW_STATE_DIR}/skills/local"
+    - "${HOME}/.codex/skills"
+    - "./.agents/skills"
+  debug: false
+  watch: true
+  watch_bundled: false
+  watch_debounce_ms: 250
+  load_mode: "session" # once | turn | session
+  # loadMode: "turn"
+  max_loaded_skills: 10
+  # maxLoadedSkills: 10
+  loaded_content_in_tool_results: true
+  # loadedContentInToolResults: true
+  skip_fallback_on_session_summary: false
+  # skipFallbackOnSessionSummary: false
+  coding_agent:
+    execution_mode: "host" # sandbox | auto | host
+    # sandbox: internal coding backend 始终留在 sandbox 里跑，遇到限制就明确报出来。
+    # auto: internal coding backend 先走 sandbox；遇到 Landlock / permission denied 再重试一次 host。
+    # host: internal coding backend 优先在宿主机跑真实写文件和自检。
+    # default_workdir:
+    # 如果不写，运行时会直接把当前工作目录当成默认代码工作区。
+    # scratch_root: "${TRPC_CLAW_STATE_DIR}/workspaces/scratch"
+    # 做临时小项目、toy repo、示例代码时，可优先在 scratch_root 下新建
+    # git repo。
+    # 这里主要提供运行时默认工作区/产物根等上下文，不再鼓励模型显式切去 coding-agent。
+    # 如果你自己显式写了 tooling_guidance，上面这个快捷配置就不再生效。
+  # tooling_guidance: ""
+  # toolingGuidance: ""
+  # entries:
+  #   coding-agent:
+  #     enabled: true
+
+# 默认把常用工具都打开，做到“装完就能玩”。
+# providers / toolsets 的 config 结构取决于 type，对应源码里的注册插件。
+# 当前上游内置 provider type:
+#   - duckduckgo
+#   - webfetch_http
+# 当前上游内置 toolset type:
+#   - mcp
+#   - file
+#   - openapi
+#   - google
+#   - wikipedia
+#   - arxivsearch
+#   - email
+# exec_command 以及显式启用的本地执行工具默认会继承当前
+# trpc-claw 进程环境。
+# 运行时还会自动把当前 trpc-claw 所在目录、state_dir/tools、
+# state_dir/toolchain/bin、state_dir/toolchain/python/bin，以及常见
+# 用户态 bin 目录（如 ~/.local/bin、~/bin、~/go/bin、~/.cargo/bin
+# 和部分 env 推导的 bin）前置到 PATH；这些约定目录不需要预先创建。
+# 镜像里额外的目录可通过
+# TRPC_CLAW_EXTRA_PATH_DIRS 追加。
+tools:
+  enable_local_exec: true
+  enable_openclaw_tools: true
+  openclaw_tooling_guidance: ""
+  enable_parallel_tools: true
+  refresh_toolsets_on_run: false
+  providers:
+    - type: "envprobe"
+      # 安全检查当前进程和受信任 env 文件里是否声明了某个变量，
+      # 只返回存在性与来源，不暴露变量值。
+    - type: "duckduckgo"
+      config:
+        timeout: "30s"
+    - type: "webfetch_http"
+      config:
+        allow_all_domains: true
+        timeout: "30s"
+        max_content_length: 50000
+        max_total_content_length: 150000
+        # 如果你要收紧权限，优先改成域名白名单：
+        # allowed_domains:
+        #   - "docs.qq.com"
+        #   - "openai.com"
+  toolsets:
+    - type: "file"
+      name: "fs"
+      config:
+        base_dir: "${TRPC_CLAW_STATE_DIR}"
+        read_only: false
+        enable_save: true
+        enable_replace: true
+        max_file_size: 10485760
+        # 如果你只想浏览文件，不想让 Agent 改本地文件：
+        # read_only: true
+        # 如果你想让它直接读写当前项目目录，也可以改成 "."
+    - type: "wikipedia"
+      name: "wiki"
+      config:
+        language: "zh"
+        max_results: 5
+    - type: "arxivsearch"
+      name: "arxiv"
+      config:
+        page_size: 5
+        delay_seconds: "1s"
+        num_retries: 3
+    # 下面这些能力也支持，但需要你按注释补齐配置后再打开：
+    # - type: "google"
+    #   name: "google"
+    #   config:
+    #     lang: "zh-CN"
+    #     size: 5
+    #     # api_key: "replace-with-your-google-api-key"
+    #     # engine_id: "replace-with-your-google-search-engine-id"
+    # - type: "openapi"
+    #   name: "demo_api"
+    #   config:
+    #     spec:
+    #       file: "./petstore.yaml"
+    #     timeout: "30s"
+    # - type: "browser"
+    #   name: "browser"
+    #   config:
+    #     default_profile: "openclaw"
+    #     profiles:
+    #       - name: "openclaw"
+    #         transport: "stdio"
+    #         command: "trpc-claw-browser-runtime"
+    #         args:
+    #           - "mcp-stdio"
+    # 先用 `trpc-claw-browser-runtime doctor` 看当前运行时是否就绪。
+    # 普通网页文本优先走 web_fetch，只有在 JS 渲染、交互、登录态、
+    # 下载、截图或视觉验证时再开 browser。
+    # 如果环境特殊，只需要关注两个公开变量：
+    #   TRPC_CLAW_BROWSER_MODE=auto|headless|interactive
+    #   TRPC_CLAW_BROWSER_PATH=/path/to/chromium-or-chrome
+    # - type: "email"
+    #   name: "mail"
+
+# 可选：Session 后端。
+# backend 内置支持:
+#   - inmemory
+#   - redis
+#   - sqlite
+#   - mysql
+#   - postgres
+#   - clickhouse
+session:
+  backend: "sqlite"
+  summary:
+    enabled: true
+    mode: "auto" # auto: 根据模型 context window 自动触发 | manual: 使用手动阈值
+    approx_runes_per_token: 1.6 # 中文场景；英文可设 4.0 或不配（默认 4.0）
+  config:
+    path: "${TRPC_CLAW_STATE_DIR}/sessions.sqlite"
+
+# 可选：Memory 后端。
+# 当前默认主推 file-based memory，不再默认落持久化检索库。
+# 如果你确实需要可搜索的结构化 memory，可切回 sqlitevec / pgvector。
+memory:
+  backend: "file"
+  auto:
+    enabled: false
+  # 如果你要恢复结构化 / 可检索 memory，可改成例如：
+  # backend: "sqlitevec"
+  # limit: 100
+  # fallback_to_sqlite_on_embedding_unsupported: true
+  # auto:
+  #   enabled: true
+  # config:
+  #   path: "${TRPC_CLAW_STATE_DIR}/memories_vec.sqlite"
+  #   embedder:
+  #     type: "openai"
+  #     model: "text-embedding-3-small"

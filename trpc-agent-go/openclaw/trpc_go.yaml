@@ -1,0 +1,45 @@
+global:
+  # 可选：业务命名空间。主要用于日志、监控、服务治理标识。
+  namespace: development
+  # 可选：环境名。常见值如 dev / test / staging / prod。
+  env_name: test
+
+server:
+  service:
+    # 当前 cmd/openclaw 入口默认会把 Gateway、A2A 和共享 ingress
+    # 都挂到这个 service name 上。
+    - name: trpc.openclaw.gateway
+      # 可选：绑定 IP。
+      # ip: 127.0.0.1
+      # OpenClaw 启动时会默认关闭这个监听端口的 reuseport；
+      # 同机重复启动第二个实例会直接报端口占用。
+      port: 8080
+      # 常见为 tcp。只有你明确要走 unix socket 时再改。
+      network: tcp
+      # 当前分发版使用 http_no_protocol。
+      protocol: http_no_protocol
+      # 单位毫秒。这里是 60 秒。
+      timeout: 60000
+
+plugins:
+  log:
+    default:
+      # 控制台日志：适合开发调试、容器 stdout 收集。
+      - writer: console
+        level: info
+        formatter: json
+
+      # 文件日志：默认落到 state_dir 下，便于排查线上问题。
+      - writer: file
+        level: info
+        formatter: json
+        writer_config:
+          filename: ${TRPC_CLAW_STATE_DIR}/trpc.log
+          # 单个日志文件最大大小，单位 MB。
+          max_size: 10
+          # 最多保留多少个历史文件。
+          max_backups: 10
+          # 文件最大保留天数。
+          max_age: 7
+          # 如需压缩归档，可按团队规范自行开启。
+          # compress: true

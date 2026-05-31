@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tapd": {
+      "url": "https://prod.mcp.it.woa.com/tapdwoa/tapdmcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_TAPD_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

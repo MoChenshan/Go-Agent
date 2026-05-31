@@ -1,0 +1,84 @@
+# =============================================================================
+# docker-compose.obs.yaml —— Langfuse + Prometheus + Grafana 观测栈
+#
+# 启动：
+#   docker compose -f observability/docker-compose.obs.yaml up -d
+#
+# 访问：
+#   Langfuse UI  → http://localhost:3000   (首次注册即是 admin)
+#   Grafana      → http://localhost:3001   (admin / admin)
+#   Prometheus   → http://localhost:9090
+# =============================================================================
+version: "3.9"
+
+services:
+  # ---------- Langfuse Postgres ----------
+  langfuse_db:
+    image: postgres:16-alpine
+    container_name: obs-langfuse-db
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - ../output/obs/langfuse_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---------- Langfuse Server（自托管 v2） ----------
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: obs-langfuse
+    depends_on:
+      langfuse_db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse_db:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: gameops-langfuse-secret
+      SALT: gameops-langfuse-salt
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
+    restart: unless-stopped
+
+  # ---------- Prometheus ----------
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: obs-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../output/obs/prom_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    restart: unless-stopped
+
+  # ---------- Grafana ----------
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: obs-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../output/obs/grafana_data:/var/lib/grafana
+      - ./grafana_provisioning:/etc/grafana/provisioning:ro
+      - ./grafana_dashboard.json:/var/lib/grafana/dashboards/gameops.json:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+networks:
+  default:
+    name: gameops-obs
+    # 允许 rag_docker-compose.yaml 中的容器通过 external 网络接入

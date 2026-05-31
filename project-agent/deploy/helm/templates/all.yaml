@@ -1,0 +1,282 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "gameops-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "gameops-agent.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MODEL_NAME
+              value: {{ .Values.config.modelName | quote }}
+            - name: SESSION_BACKEND
+              value: {{ .Values.config.session.backend | quote }}
+            - name: SESSION_REDIS_ADDR
+              value: {{ .Values.config.session.redisAddr | quote }}
+            - name: SESSION_EVENT_THRESHOLD
+              value: {{ .Values.config.session.eventThreshold | quote }}
+            - name: IDEMPOTENCY_BACKEND
+              value: {{ .Values.config.idempotency.backend | quote }}
+            - name: IDEMPOTENCY_REDIS_ADDR
+              value: {{ .Values.config.idempotency.redisAddr | quote }}
+            - name: IDEMPOTENCY_TTL
+              value: {{ .Values.config.idempotency.ttl | quote }}
+            - name: OTEL_ENABLED
+              value: {{ .Values.config.otel.enabled | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.config.otel.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_SERVICE_NAME
+              value: {{ include "gameops-agent.fullname" . | quote }}
+            - name: OTEL_TRACES_SAMPLER
+              value: {{ .Values.config.otel.sampler | quote }}
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: {{ .Values.config.otel.samplerArg | quote }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gameops-agent.fullname" . }}-secrets
+                  key: openai-api-key
+            - name: AUDIT_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gameops-agent.fullname" . }}-secrets
+                  key: audit-hmac-key
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gameops-agent.fullname" . }}-secrets
+                  key: langfuse-public-key
+                  optional: true
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gameops-agent.fullname" . }}-secrets
+                  key: langfuse-secret-key
+                  optional: true
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          # 优雅关闭：让 SIGTERM 后还能继续处理 in-flight 请求 30s
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: audit
+              mountPath: /app/audit_data
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: audit
+          emptyDir: {}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gameops-agent.selectorLabels" . | nindent 4 }}
+---
+{{- if .Values.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "gameops-agent.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- if .Values.autoscaling.customMetrics.enabled }}
+    - type: Pods
+      pods:
+        metric:
+          name: gameops_session_inflight
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.autoscaling.customMetrics.targetSessionsInFlight }}
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "gameops-agent.selectorLabels" . | nindent 6 }}
+{{- end }}
+---
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "gameops-agent.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.ingressFromNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # 内网允许（LLM/BCS/BK/Redis/OTel/Webhook 回调）
+    {{- range .Values.networkPolicy.allowedEgressCIDRs }}
+    - to:
+        - ipBlock:
+            cidr: {{ . }}
+            except:
+              - 169.254.0.0/16   # 拒绝云元数据接口（防 SSRF）
+      ports:
+        - protocol: TCP
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "gameops-agent.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}-secrets
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  openai-api-key:        {{ .Values.secrets.openaiApiKey | quote }}
+  langfuse-public-key:   {{ .Values.secrets.langfusePublicKey | quote }}
+  langfuse-secret-key:   {{ .Values.secrets.langfuseSecretKey | quote }}
+  audit-hmac-key:        {{ .Values.secrets.auditHmacKey | quote }}

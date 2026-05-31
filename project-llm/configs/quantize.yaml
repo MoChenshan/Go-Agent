@@ -1,0 +1,88 @@
+# =============================================================================
+# 量化配置（两大方向通用入口）
+# 方向一（GPU 部署）：FP8 E4M3 / GPTQ-Marlin 4-bit / AWQ 4-bit
+# 方向二（端侧部署）：GGUF（Q4_K_M / IQ4_XS / Q4_K_S / Q2_K）/ ExecuTorch / QNN
+#
+# 使用方式：
+#   - FP8 / GPTQ / AWQ → 由 llmcompressor / auto-gptq / autoawq 读取
+#   - GGUF            → 由 scripts/quantize_gguf.sh 读取
+#   - ExecuTorch / QNN → 由 deploy/executorch/*.py、deploy/qnn/convert.sh 读取
+# =============================================================================
+
+# ----------------------------------------------------------------------------
+# 知识库方向（GPU 侧量化）
+# ----------------------------------------------------------------------------
+knowledge:
+  input_model: ./output/knowledge_sft_merged
+  calib_dataset: ./data/processed/knowledge_qa.json
+  calib_samples: 512
+
+  # FP8 E4M3（首选，H100 / L40S / H200）
+  fp8:
+    enable: true
+    output_dir: ./output/knowledge_fp8
+    scheme: FP8_DYNAMIC           # 或 FP8_STATIC（需 calibration）
+    targets: [Linear]
+    ignore: [lm_head]
+
+  # GPTQ-Marlin 4-bit（A100 / 4090 推荐，吞吐最优）
+  gptq_marlin:
+    enable: true
+    output_dir: ./output/knowledge_gptq_marlin
+    bits: 4
+    group_size: 128
+    desc_act: true
+    sym: true
+    damp_percent: 0.01
+
+  # AWQ 4-bit（Ampere 通用备选）
+  awq:
+    enable: false
+    output_dir: ./output/knowledge_awq
+    bits: 4
+    group_size: 128
+    zero_point: true
+    version: GEMM
+
+# ----------------------------------------------------------------------------
+# NPC 方向（端侧量化）
+# ----------------------------------------------------------------------------
+npc:
+  input_model: ./output/npc_merged    # DPO 或 GRPO 后合并的 HF 模型
+  tmp_f16: ./output/npc-4b-f16.gguf
+
+  # GGUF 多精度（llama.cpp / Ollama / 手机端 llama.cpp）
+  gguf:
+    enable: true
+    output_dir: ./output/npc_gguf
+    precisions:
+      - name: q4_k_m                 # CPU 服务器推荐，精度/速度均衡
+        outfile: npc-4b-q4_k_m.gguf
+      - name: iq4_xs                 # 2026 新推荐端侧版，体积更小质量更好
+        outfile: npc-4b-iq4_xs.gguf
+      - name: q4_k_s                 # 手机端
+        outfile: npc-1.7b-q4_k_s.gguf
+      - name: q2_k                   # 极端低资源
+        outfile: npc-0.6b-q4_k_s.gguf
+
+  # ExecuTorch（iOS CoreML / Android XNNPACK）
+  executorch:
+    enable: true
+    bits: 4
+    group_size: 128
+    backends:
+      ios: coreml                    # A17/A18 ANE
+      android: xnnpack               # CPU + GPU delegate
+
+  # 高通 QNN NPU（骁龙 8 Gen3 / 8 Elite）
+  qnn:
+    enable: false                     # 需要 QNN SDK + 商业授权
+    quant_type: int8
+    htp_backend: true
+    config: deploy/qnn/quant_config.json
+
+  # MLC-LLM（跨平台：iOS / Android / Web / WASM）
+  mlc:
+    enable: false
+    quantization: q4f16_1
+    output_dir: ./output/npc_mlc

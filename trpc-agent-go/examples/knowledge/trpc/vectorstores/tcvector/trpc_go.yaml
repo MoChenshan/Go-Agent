@@ -1,0 +1,13 @@
+client:                                                        # 客户端调用的后端配置
+  namespace: Development                                       # 针对所有后端的环境
+  service:                                                     # 针对单个后端的配置
+    - name: trpc.agent.knowledge.tcvector
+plugins:                                                       # 插件配置
+  database:
+    tcvectordb:
+      client_options:
+        - service_name: trpc.agent.knowledge.tcvector          # 和 client 中的 service name 保持一致
+          url: ${TCVECTOR_URL}                                 # 数据库的 URL 地址
+          username: ${TCVECTOR_USERNAME}                       # 数据库的用户名
+          key: ${TCVECTOR_PASSWORD}                            # 数据库的密钥
+          timeout: 10s                                         # 单次 HTTP 请求处理的超时时间

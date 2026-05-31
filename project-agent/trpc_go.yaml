@@ -1,0 +1,47 @@
+# trpc_go.yaml - GameOps Agent 服务配置（D1 基础版 → D11 扩展 AGUI/A2A）
+# 说明：
+#  - net/http 启动模式：D1 就默认的 main.go 直接用 ListenAndServe，只需要第一个 service
+#  - trpc.NewServer 启动模式：`-tags a2a` 构建下启用 A2A，需要 trpc 服务注册，
+#    此时本文件的 A2A service 条目才会生效
+
+global:
+  namespace: Development
+  env_name: test
+
+server:
+  app: gameops
+  server: agent
+  service:
+    # HTTP 入口（默认 net/http 启动模式）
+    # 该 service 同时承载：POST /v1/agent（SSE）、/agui（Web 前端）、/healthz
+    - name: trpc.gameops.agent.AGUI
+      network: tcp
+      protocol: http
+      ip: 0.0.0.0
+      port: 8080
+      timeout: 60000    # 60s，Agent 调用链较长需要足够超时
+
+    # A2A 协议端口（仅在 `go build -tags a2a ./...` + trpc.NewServer 模式下生效）
+    # 对外暴露 GameOps Coordinator 给其他 Agent 远程调用。
+    - name: trpc.gameops.agent.A2A
+      network: tcp
+      protocol: http_no_protocol   # A2A 注册的是 thttp server
+      ip: 0.0.0.0
+      port: 8081
+      timeout: 0                   # 流式场景不限超时
+
+client:
+  service:
+    - name: llm_client
+      protocol: http
+      timeout: 0        # 流式输出不限超时
+      conn_type: httppool
+      httppool:
+        idle_conn_timeout: 50s
+        max_idle_conns_per_host: 100
+
+plugins:
+  log:
+    default:
+      - writer: console
+        level: info

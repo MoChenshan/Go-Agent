@@ -1,0 +1,31 @@
+global:  # 全局配置
+  namespace: Development  # 环境类型，分正式 production 和非正式 development 两种类型
+  env_name: test  # 环境名称，非正式环境下多环境的名称
+
+server:  # 服务端配置
+  app: test  # 业务的应用名
+  server: follow  # 进程服务名
+  bin_path: /usr/local/trpc/bin/  # 二进制可执行文件和框架配置文件所在路径
+  conf_path: /usr/local/trpc/conf/  # 业务配置文件所在路径
+  data_path: /usr/local/trpc/data/  # 业务数据文件所在路径
+  service:  # 业务服务提供的 service，可以有多个
+      # service 的路由名称
+    - name: trpc.test.follow.agui
+      ip: 127.0.0.1  # 服务监听 ip 地址 可使用占位符 ${ip},ip 和 nic 二选一，优先 ip
+      port: 8080  # 服务监听端口 可使用占位符 ${port}
+      network: tcp  # 网络监听类型 tcp udp
+      protocol: http_no_protocol  # 应用层协议
+
+plugins:  # 插件配置
+  log:  # 日志配置
+    default:  # 默认日志的配置，可支持多输出
+      - writer: console  # 控制台标准输出 默认
+        level: debug  # 标准输出日志的级别
+      - writer: file  # 本地文件日志
+        level: info  # 本地文件滚动日志的级别
+        writer_config:
+          filename: ./trpc.log  # 本地文件滚动日志存放的路径
+          max_size: 10  # 本地文件滚动日志的大小 单位 MB
+          max_backups: 10  # 最大日志文件数
+          max_age: 7  # 最大日志保留天数
+          compress: false  # 日志文件是否压缩

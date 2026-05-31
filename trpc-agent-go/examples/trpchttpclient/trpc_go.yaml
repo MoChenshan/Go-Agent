@@ -1,0 +1,21 @@
+global: # global config
+  namespace: development # environment type: production or development
+  env_name: test # environment name
+
+client: # client configuration
+  timeout: 60000 # default timeout in milliseconds (60s for Agent calls)
+  namespace: development # client namespace
+  service: # client service configuration
+    - name: trpc.test.llm.openai # service name for LLM HTTP client (tRPC style naming)
+      target: "" # target will be set by OPENAI_BASE_URL
+      timeout: 60000 # timeout for LLM calls
+      protocol: http # HTTP protocol
+
+plugins: # plugin configuration
+  log: # log plugin
+    default: # default log configuration
+      - writer: console # console writer
+        level: info # log level
+        formatter: console # log formatter
+        colorful: true # enable colorful output
+        caller_skip: 2 # caller skip level

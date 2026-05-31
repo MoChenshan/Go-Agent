@@ -1,0 +1,87 @@
+# ServiceAccount + RBAC（最小权限） — GameOps Agent
+# 应用前提：deploy/helm/Chart.yaml 启用 rbac=true
+{{- if .Values.rbac.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gameops-agent.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+rules:
+  # 1) 自身 Pod / Service 状态查询（健康检查、自适应限流）
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  # 2) 读 Pod 日志（diagnosis_agent 主用）
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  # 3) Event：故障排查
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  # 4) Lease：HA leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "gameops-agent.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gameops-agent.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# NetworkPolicy：默认禁外联，仅放行已知依赖（vllm / redis / postgres / otel）
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gameops-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "gameops-agent.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 6379  # redis
+        - protocol: TCP
+          port: 5432  # postgres
+        - protocol: TCP
+          port: 8000  # vllm
+        - protocol: TCP
+          port: 4317  # otel grpc
+        - protocol: TCP
+          port: 4318  # otel http
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53    # CoreDNS
+{{- end }}
+{{- end }}

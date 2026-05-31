@@ -1,0 +1,38 @@
+{
+    "_comment": "高通 QNN INT8 量化覆盖配置。Attention 层需更高精度，FFN 可更激进。",
+    "activation_encodings": {
+        "_default": {
+            "bitwidth": 8,
+            "dtype": "int",
+            "is_symmetric": "False"
+        }
+    },
+    "param_encodings": {
+        "_default": {
+            "bitwidth": 8,
+            "dtype": "int",
+            "is_symmetric": "True"
+        },
+        "lm_head.weight": {
+            "bitwidth": 16,
+            "dtype": "int",
+            "is_symmetric": "True",
+            "_note": "lm_head 对精度敏感，保留 INT16"
+        },
+        "model.embed_tokens.weight": {
+            "bitwidth": 16,
+            "dtype": "int",
+            "is_symmetric": "True"
+        }
+    },
+    "excluded_layers": [],
+    "op_type": {
+        "LayerNorm": {
+            "activation_encodings": {"bitwidth": 16, "dtype": "int"}
+        },
+        "Softmax": {
+            "activation_encodings": {"bitwidth": 16, "dtype": "int"}
+        }
+    },
+    "version": "0.6.1"
+}

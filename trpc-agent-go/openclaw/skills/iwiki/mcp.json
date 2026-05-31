@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "iwiki": {
+      "url": "https://prod.mcp.it.woa.com/app_iwiki_mcp/mcp3",
+      "headers": {
+        "Authorization": "Bearer ${MCP_IWIKI_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

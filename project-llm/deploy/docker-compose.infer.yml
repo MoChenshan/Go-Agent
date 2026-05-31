@@ -1,0 +1,79 @@
+# project-llm 推理栈（vLLM + Qdrant + RAG service + Prometheus）
+#
+# 用法：
+#   make docker-infer    # 先构建镜像
+#   docker compose -f deploy/docker-compose.infer.yml up -d
+#   curl http://localhost:8000/v1/models
+#   curl http://localhost:8001/healthz
+#
+# 注意：vLLM 容器需要 NVIDIA GPU，请先安装 NVIDIA Container Toolkit
+#       并通过 deploy.resources.reservations.devices 透传 GPU。
+
+version: "3.9"
+
+services:
+  vllm:
+    image: project-llm-infer:latest
+    container_name: project-llm-vllm
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_HOME=/data/hf
+    volumes:
+      - ./../ckpt:/ckpt:ro
+      - ./../data:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.11.0
+    container_name: project-llm-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  rag:
+    image: project-llm-infer:latest
+    container_name: project-llm-rag
+    command:
+      - python
+      - rag_serve.py
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8001"
+    ports:
+      - "8001:8001"
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - vllm
+      - qdrant
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: project-llm-prom
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:

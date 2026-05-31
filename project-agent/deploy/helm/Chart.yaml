@@ -1,0 +1,16 @@
+apiVersion: v2
+name: gameops-agent
+description: GameOps Agent — Production-grade SRE Agent
+type: application
+version: 1.8.1
+appVersion: "1.8.1"
+keywords:
+  - agent
+  - llm
+  - sre
+  - oncall
+home: https://git.woa.com/trpc-go/gameops-agent
+sources:
+  - https://git.woa.com/trpc-go/gameops-agent
+maintainers:
+  - name: gameops-agent-team

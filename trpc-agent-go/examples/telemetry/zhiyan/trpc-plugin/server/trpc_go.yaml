@@ -1,0 +1,47 @@
+global: # 全局配置
+  namespace: Development # 环境类型，分正式 Production 和非正式 Development 两种类型
+  env_name: pre # 环境名称，非正式环境下多环境的名称
+  container_name: pre.knocknock_test.short_token_proxy.gz100005 # 容器名称
+  local_ip: 11.151.226.17 # 本地 IP，容器内为容器 ip，物理机或虚拟机为本机 ip
+  admin_port: 19829 #管理命令服务端口
+  enable_set: N #是否启用set
+  full_set_name: #set名
+server:
+  filter:
+    - opentelemetry         #在tRPC服务端处理过程，引入opentelemetry拦截器
+  app: knocknock_test # 业务的应用名
+  server: short_token_proxy # 进程服务名
+  service:                                          # business service configuration, can have multiple.
+    - name: trpc.app.app.agent                      # the route name of the service. 
+      ip: 127.0.0.1                                 # the service listening ip address, can use the placeholder ${ip}, choose one of ip and nic, priority ip. 
+      port: 8080                                    # the service listening port, can use the placeholder ${port}.
+      network: tcp                                  # the service listening network type.
+      protocol: http_no_protocol                    # the service application protocol.
+      timeout: 1000000                              # the service process timeout.
+plugins:
+  log:
+    default:
+      - writer: console
+        level: info
+  telemetry: # 注意缩进层级关系
+    opentelemetry:
+      tenant_id: 12128#apm-log-8a5da7616e4dadcc#4807_32235___apm
+      addr: trace.zhiyan.tencent-cloud.net:4317 # 集群地址
+      metrics:
+        enabled: true
+      sampler:
+        fraction: 1   # 万分之一采样（0.0001代表每10000请求上报一次trace数据,同理0.01为每100 上报一次trace数据, 如果需要100%采样，修改为1,强烈建议配置采用率）
+      logs:
+        enabled: true # 远程日志开关，默认关闭
+        level: "debug" # 日志级别，默认error
+        enable_sampler: false # 是否启用采样器, 启用后只有当前请求命中采样时才会上报独立日志（需要平台支持染色采样接口，部分平台可能不支持请咨询平台方）
+        # trace_log(follow log)模式,  枚举值可选:verbose/disable
+        # verbose:以DEBUG级别打印flow log包括接口名、请求、响应、耗时, disable:不打印, 默认不打印
+        trace_log_mode: "verbose"
+        disable_recovery: false # log filter默认会recovery panic并打印日志上报指标
+      traces:
+        disable_trace_body: false # trace对req和rsp的上报开关, true:关闭上报以提升性能, false:上报, 默认上报
+        enable_deferred_sample: false # 是否开启延迟采样 在span结束后的导出采样, 额外上报出错的/高耗时的. 默认: disable
+        deferred_sample_error: true # 采样出错的
+        deferred_sample_slow_duration: 500ms # 采样耗时大于指定值的
+        disable_parent_sampling: false  # 默认 false, 开启后将不使用上游的采样结果

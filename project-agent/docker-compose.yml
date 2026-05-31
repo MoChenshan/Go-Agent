@@ -1,0 +1,157 @@
+# ============================================================
+# GameOps Agent — 完整本地栈
+# ============================================================
+#  - agent           主服务（HTTP :8080，SSE/AG-UI/Webhook）
+#  - redis           会话持久化 / 幂等键
+#  - postgres        Langfuse 后端
+#  - otel-collector  OpenTelemetry Collector（OTLP gRPC :4317 / HTTP :4318）
+#  - jaeger          分布式追踪 UI（http://localhost:16686）
+#  - langfuse        LLM Trace 平台（http://localhost:3001）
+#  - prometheus      指标采集（http://localhost:9090）
+#  - grafana         看板（http://localhost:3000，admin/admin）
+# ============================================================
+
+services:
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    image: gameops-agent:latest
+    container_name: gameops-agent
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - otel-collector
+    ports:
+      - "8080:8080"
+    environment:
+      # ----- 模型 -----
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-stub}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-http://host.docker.internal:8000/v1}
+      MODEL_NAME: ${MODEL_NAME:-hunyuan-turbo-s}
+      # ----- Session（Redis） -----
+      SESSION_BACKEND: redis
+      SESSION_REDIS_ADDR: redis:6379
+      SESSION_EVENT_THRESHOLD: "20"
+      # ----- 幂等键（Redis） -----
+      IDEMPOTENCY_BACKEND: redis
+      IDEMPOTENCY_REDIS_ADDR: redis:6379
+      IDEMPOTENCY_TTL: "24h"
+      # ----- OTel -----
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: gameops-agent
+      OTEL_TRACES_SAMPLER: parentbased_traceidratio
+      OTEL_TRACES_SAMPLER_ARG: "0.3"
+      # ----- Langfuse -----
+      LANGFUSE_HOST: http://langfuse:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-stub}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-stub}
+      # ----- 审计 -----
+      AUDIT_HMAC_KEY: ${AUDIT_HMAC_KEY:-dev-only-not-for-prod}
+      AUDIT_SINK: file
+      AUDIT_FILE_PATH: /app/audit.log
+    volumes:
+      - agent_audit:/app/audit_data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: gameops-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gameops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: gameops-otelcol
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./deploy/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    container_name: gameops-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # UI
+      - "14250:14250"
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: gameops-langfuse
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@postgres:5432/langfuse
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: dev-only-secret-change-me
+      SALT: dev-only-salt
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "3001:3000"
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: gameops-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/alerts/prometheus_rules.yaml:/etc/prometheus/rules/rules.yaml:ro
+      - prom_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: gameops-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  redis_data:
+  pg_data:
+  prom_data:
+  grafana_data:
+  agent_audit:

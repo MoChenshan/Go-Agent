@@ -1,0 +1,7 @@
+phase,gpu,strategy,model_size,n_gpu,seq_len,batch,steps_per_sec,gpu_mem_gb,tokens_per_sec_per_gpu,note
+sft,A100-40G,DDP,4B,4,2048,4,0.41,38.2,3360,baseline
+sft,A100-40G,FSDP-zero3,8B,4,2048,4,0.32,32.1,2620,zero3 saved 16%
+sft,A100-40G,FSDP-zero3+ckpt,8B,4,4096,2,0.18,28.4,1474,gradient ckpt
+sft,A100-40G,FSDP-zero3+lora,8B,4,4096,8,0.55,18.7,4505,LoRA r=32
+dpo,A100-40G,FSDP-zero2,4B,4,2048,2,0.21,36.8,860,DPO 双前向
+grpo,A100-80G,FSDP-zero2+vllm,4B,2,2048,16,0.05,72.4,1638,GRPO+vLLM rollout

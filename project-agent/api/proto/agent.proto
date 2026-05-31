@@ -1,0 +1,137 @@
+// agent.proto — GameOps Agent gRPC/tRPC 对外契约（与 api/openapi.yaml 等价）。
+//
+// 用途：trpc-go 生态中以 .proto 描述服务契约，由 trpc create -p agent.proto
+// 自动生成 server/client 桩。HTTP 入口 main.go 中已用 net/http 暴露同名能力，
+// 本文件用于：
+//   1. 跨语言 SDK 生成（Python / Java / Node 调用 Agent）；
+//   2. trpc-go 服务发现 / 注册 / 监控 / 限流策略落地；
+//   3. 对接 A2A 协议时直接复用 RunAgent / StreamAgent。
+//
+// 生成命令（示例）：
+//   trpc create -p api/proto/agent.proto -o src/services/grpc
+//   protoc --go_out=. --go-grpc_out=. api/proto/agent.proto
+
+syntax = "proto3";
+
+package gameops.agent.v1;
+
+option go_package = "git.woa.com/trpc-go/gameops-agent/api/proto/agent;agentpb";
+
+// AgentService 是 GameOps Agent 对外的核心服务。
+service AgentService {
+  // RunAgent 一次性运行（同步返回完整结果，超时由 deadline 控制）。
+  rpc RunAgent(RunAgentRequest) returns (RunAgentResponse);
+
+  // StreamAgent 流式运行（SSE/server-streaming，逐 token / 逐 step 推送）。
+  rpc StreamAgent(RunAgentRequest) returns (stream AgentEvent);
+
+  // ApproveAction 人在回路审批接口：当 Agent 走到高风险工具调用并 wait_for_human 时，
+  // 通过此 RPC 由人工放行 / 拒绝。
+  rpc ApproveAction(ApproveRequest) returns (ApproveResponse);
+
+  // GetReport 拉取 case 的完整报告（markdown / json）。
+  rpc GetReport(GetReportRequest) returns (GetReportResponse);
+
+  // Health 健康检查（与 /healthz 等价）。
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// RunAgentRequest 一次 Agent 运行的输入。
+message RunAgentRequest {
+  // session_id 用于关联多轮对话（HITL 必填）。
+  string session_id = 1;
+  // user_id 调用方身份。
+  string user_id = 2;
+  // input 用户输入文本（自然语言）。
+  string input = 3;
+  // case_id 业务案例号（如告警 fingerprint / TAPD 单号），为空则由服务侧生成。
+  string case_id = 4;
+  // metadata 任意业务元数据（webhook 来源、tag 等）。
+  map<string, string> metadata = 5;
+  // model 覆盖默认模型。
+  string model = 6;
+  // request_id 客户端去重 / 幂等键。
+  string request_id = 7;
+}
+
+message RunAgentResponse {
+  string case_id = 1;
+  string session_id = 2;
+  // final_output 最终回答（markdown）。
+  string final_output = 3;
+  // tool_calls 本次执行调用过的工具列表（按时间序）。
+  repeated ToolCall tool_calls = 4;
+  // usage Token 用量统计。
+  TokenUsage usage = 5;
+  // status success / failed / waiting_human。
+  string status = 6;
+  // error 失败原因（status=failed 时）。
+  string error = 7;
+}
+
+// AgentEvent 流式事件（与 OTel GenAI semconv 对齐）。
+message AgentEvent {
+  enum Kind {
+    UNKNOWN = 0;
+    LLM_DELTA = 1;        // 模型流式增量
+    TOOL_CALL_START = 2;
+    TOOL_CALL_END = 3;
+    HUMAN_REQUIRED = 4;   // 走到 HITL 等待
+    DONE = 5;             // 终点
+    ERROR = 6;
+  }
+  Kind kind = 1;
+  string author = 2;       // coordinator / diagnosis_agent / repair_agent / ...
+  string content_delta = 3;// LLM_DELTA 携带的增量文本
+  ToolCall tool_call = 4;  // TOOL_CALL_* 携带的工具信息
+  string error = 5;
+  int64 ts_unix_ms = 6;
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  string args_json = 3;     // 序列化后的参数（避免 protobuf 强 schema 锁死）
+  string result_json = 4;   // 序列化后的结果（同上）
+  int64 latency_ms = 5;
+  string status = 6;        // success / failed / approval_required
+}
+
+message TokenUsage {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 total_tokens = 3;
+  // estimated_cost_usd 估算成本（按模型定价表）。
+  double estimated_cost_usd = 4;
+}
+
+message ApproveRequest {
+  string case_id = 1;
+  string approval_token = 2;  // 服务侧生成的一次性 token，避免重放
+  bool   approved = 3;
+  string approver = 4;        // 人工审批者
+  string comment = 5;
+}
+
+message ApproveResponse {
+  string case_id = 1;
+  string status = 2;          // resumed / rejected / expired
+}
+
+message GetReportRequest {
+  string case_id = 1;
+  string format = 2;          // markdown / json
+}
+
+message GetReportResponse {
+  string case_id = 1;
+  string format = 2;
+  bytes  content = 3;
+}
+
+message HealthRequest {}
+message HealthResponse {
+  string status = 1;          // ok / degraded
+  map<string, string> components = 2; // redis / postgres / langfuse 各组件状态
+  int64 uptime_seconds = 3;
+}

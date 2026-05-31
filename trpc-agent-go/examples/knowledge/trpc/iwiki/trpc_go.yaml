@@ -1,0 +1,12 @@
+global:
+  namespace: Development
+  env_name: test
+
+client:
+  service:
+    - name: trpc.test.knowledge.iwiki
+      # IDC/DevCloud: api-idc.sgw.woa.com
+      # Desktop/OA:   api.sgw.woa.com
+      target: dns://api-idc.sgw.woa.com
+      protocol: http_no_protocol
+      timeout: 10000

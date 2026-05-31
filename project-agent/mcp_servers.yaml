@@ -1,0 +1,176 @@
+# MCP Servers 配置
+# 参考：GameOps Agent 完整执行方案.md 第四章
+#
+# 字段说明：
+#   - name:           内部名称（唯一），用于 target 映射
+#   - target:         目标服务域（"bk-monitor" / "bcs" / "gongfeng" / "devops" / "tapd" / "*"）
+#                     target="*" 表示通用工具，对所有 Agent 可见
+#   - url:            Streamable HTTP MCP 端点
+#   - transport:      streamable | sse（2025-03 MCP 规范默认 streamable）
+#   - timeout:        连接超时（秒）
+#   - auth_header:    认证 Header 名
+#   - auth_value:     认证值（支持 ${ENV_VAR} 占位符）
+#   - allowed_tools:  可选，允许使用的工具名白名单（空则全部）
+#   - enabled:        是否启用，默认 true；false 则跳过注册
+#
+# ⚠ 当前所有条目默认 enabled: false，待取得真实 MCP 端点与凭据后再打开。
+# 与此同时，DiagnosisAgent 已通过 src/tools/bk_tools/ 的 FunctionTool 直接对接
+# 蓝鲸 APIGW（X-Bkapi-Authorization 鉴权），无需依赖这里的 MCP Server。
+
+mcp_servers:
+  # ========== 蓝鲸监控 × 7（target=bk-monitor） ==========
+  - name: bk-metrics
+    target: bk-monitor
+    url: ${BK_MCP_METRICS_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-log
+    target: bk-monitor
+    url: ${BK_MCP_LOG_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-alarm
+    target: bk-monitor
+    url: ${BK_MCP_ALARM_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-event
+    target: bk-monitor
+    url: ${BK_MCP_EVENT_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-tracing
+    target: bk-monitor
+    url: ${BK_MCP_TRACING_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-metadata
+    target: bk-monitor
+    url: ${BK_MCP_METADATA_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  - name: bk-dashboard
+    target: bk-monitor
+    url: ${BK_MCP_DASHBOARD_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-Bkapi-Authorization
+    auth_value: ${BK_APIGW_AUTH}
+    enabled: false
+
+  # ========== BCS 容器平台 × 4（target=bcs） ==========
+  - name: bcs-project
+    target: bcs-read
+    url: ${BCS_MCP_PROJECT_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${BCS_TOKEN}
+    enabled: false
+
+  - name: bcs-cluster
+    target: bcs-read
+    url: ${BCS_MCP_CLUSTER_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${BCS_TOKEN}
+    enabled: false
+
+  - name: bcs-resource
+    target: bcs-read
+    url: ${BCS_MCP_RESOURCE_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${BCS_TOKEN}
+    enabled: false
+
+  - name: bcs-helm
+    target: bcs-write
+    url: ${BCS_MCP_HELM_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${BCS_TOKEN}
+    enabled: false
+
+  # ========== TAPD × 1（target=tapd） ==========
+  - name: tapd
+    target: tapd
+    url: ${TAPD_MCP_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${TAPD_TOKEN}
+    enabled: false
+
+  # ========== 蓝盾 CI/CD × 1（target=devops） ==========
+  - name: devops-pipeline
+    target: devops
+    url: ${DEVOPS_MCP_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: X-DEVOPS-UID
+    auth_value: ${DEVOPS_UID}
+    enabled: false
+
+  # ========== 知识库（target=*，对所有 Agent 可见） ==========
+  - name: iwiki
+    target: "*"
+    url: ${IWIKI_MCP_URL}
+    transport: streamable
+    timeout: 30
+    auth_header: Authorization
+    auth_value: Bearer ${IWIKI_TOKEN}
+    enabled: false
+
+# ======== 规划清单（D2 起陆续启用）========
+#
+# 蓝鲸监控 × 7
+#   - bk-metrics          target=bk-monitor   指标查询
+#   - bk-log              target=bk-monitor   日志查询
+#   - bk-alarm            target=bk-monitor   告警查询
+#   - bk-event            target=bk-monitor   事件查询
+#   - bk-tracing          target=bk-monitor   APM Tracing
+#   - bk-metadata         target=bk-monitor   元数据查询
+#   - bk-dashboard        target=bk-monitor   仪表盘查询
+#
+# BCS 容器平台 × 4
+#   - bcs-project         target=bcs          项目管理
+#   - bcs-cluster         target=bcs          集群管理
+#   - bcs-resource        target=bcs          K8s 资源
+#   - bcs-helm            target=bcs          Helm 管理
+#
+# TAPD × 1
+#   - tapd                target=tapd         缺陷管理
+#
+# 蓝盾 CI/CD × 1
+#   - devops-pipeline     target=devops       流水线
+#
+# 知识库（RAG 补充）× *
+#   - iwiki               target=*            通用 Wiki 检索

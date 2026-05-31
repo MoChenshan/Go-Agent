@@ -1,0 +1,64 @@
+# =============================================================================
+# NPC GRPO 对比实验配置（2026 新增亮点，DeepSeek-R1 同款 RL 算法）
+# LLaMAFactory 0.9+ / TRL 0.12+ 原生支持
+# 前置：需先 merge npc_sft 得到 ./output/npc_sft_merged
+# 运行：llamafactory-cli train configs/npc_grpo.yaml
+# =============================================================================
+
+model_name_or_path: ./output/npc_sft_merged
+trust_remote_code: true
+
+stage: grpo                      # LLaMAFactory 0.9+ 原生支持 GRPO
+do_train: true
+finetuning_type: lora
+
+### 量化
+quantization_bit: 4
+quantization_method: bitsandbytes
+quantization_type: nf4
+
+### LoRA
+lora_rank: 16
+lora_alpha: 32
+lora_target: all
+lora_dropout: 0.05
+use_rslora: true
+
+### 数据（仅需 prompts 列表，无需 pairwise 数据）
+dataset: npc_grpo_prompts
+dataset_dir: ./data
+template: qwen3
+cutoff_len: 2048
+max_samples: 1000
+
+### GRPO 核心超参
+num_generations: 8               # 每个 prompt 生成 8 个 rollout 形成 group
+max_new_tokens: 512
+beta: 0.04                       # KL 惩罚，比 DPO 更小
+
+### 自定义 reward 函数（在 scripts/grpo_rewards.py 中实现）
+reward_funcs:
+  - role_consistency_reward      # 角色一致性
+  - scenario_coherence_reward    # 剧情走通
+  - format_reward                # 格式奖励（是否产出 <think>...</think>）
+
+### 训练超参
+num_train_epochs: 1
+per_device_train_batch_size: 1   # GRPO 显存占用高，batch 要小
+gradient_accumulation_steps: 8
+learning_rate: 5.0e-6
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+
+### 优化
+flash_attn: fa2
+liger_kernel: true
+
+### 日志与输出
+logging_steps: 5
+save_steps: 50
+save_total_limit: 2
+output_dir: ./output/npc_grpo
+overwrite_output_dir: true
+report_to: [tensorboard, swanlab]
+bf16: true

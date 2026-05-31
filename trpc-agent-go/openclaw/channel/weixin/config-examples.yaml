@@ -1,0 +1,112 @@
+# Weixin Channel 配置示例
+#
+# 微信账号不是直接写在 YAML 里，而是通过下面这些命令登录和维护：
+#
+#   trpc-claw weixin login
+#   trpc-claw weixin list
+#   trpc-claw weixin remove <ACCOUNT_ID>
+#
+# 或者先启动 trpc-claw，再打开 admin 的 /channels 页面，
+# 在 Weixin Runtime 区块里做二维码登录、remove、resume 和状态查看。
+#
+# 登录结果会自动写到 state_dir/weixin/accounts/*.json。
+# 运行中的 weixin channel 会自动发现新增/删除账号。
+
+# ============================================
+# 示例 1：最小 direct text 配置
+# ============================================
+
+basic_example:
+  channels:
+    - type: "weixin"
+      name: "weixin-direct"
+      config:
+        base_url: "https://ilinkai.weixin.qq.com"
+        poll_timeout: "35s"
+        error_backoff: "30s"
+        enable_typing: true
+        enable_runtime_commands: true
+
+
+# ============================================
+# 示例 2：限制可访问用户
+# ============================================
+
+allowlist_example:
+  channels:
+    - type: "weixin"
+      name: "weixin-allowlist"
+      config:
+        base_url: "https://ilinkai.weixin.qq.com"
+        poll_timeout: "35s"
+        error_backoff: "30s"
+        enable_typing: true
+        enable_runtime_commands: true
+        allow_users:
+          - "user_a@im.wechat"
+          - "user_b@im.wechat"
+
+
+# ============================================
+# 示例 3：自定义状态目录和 release 源
+# ============================================
+
+custom_state_example:
+  channels:
+    - type: "weixin"
+      name: "weixin-custom-state"
+      config:
+        state_dir: "${TRPC_CLAW_STATE_DIR}/weixin"
+        base_url: "https://ilinkai.weixin.qq.com"
+        poll_timeout: "35s"
+        error_backoff: "30s"
+        enable_typing: true
+        enable_runtime_commands: true
+        release_base_url: "https://mirrors.tencent.com/repository/generic/trpc-agent-go/trpc-claw"
+
+
+# ============================================
+# 字段说明
+# ============================================
+
+# state_dir
+# ----------------
+# 覆盖微信 channel 自己的状态目录。
+# 不配置时默认是 ${global_state_dir}/weixin。
+
+# base_url
+# ----------------
+# iLink API 基础地址。
+# 默认值是 https://ilinkai.weixin.qq.com。
+
+# poll_timeout
+# ----------------
+# getupdates 的 long-poll 超时。
+# 默认值是 35s。
+
+# error_backoff
+# ----------------
+# 拉取失败后的退避时间。
+# 默认值是 30s。
+
+# enable_typing
+# ----------------
+# 是否发送 typing 提示。
+# 默认值是 true。
+
+# enable_runtime_commands
+# ----------------
+# 是否启用：
+#   /runtime status
+#   /runtime versions
+#   /runtime changelog [version]
+# 默认值是 true。
+
+# allow_users
+# ----------------
+# 微信 user id 白名单。
+# 不配置时表示不做额外限制。
+
+# release_base_url
+# ----------------
+# runtime 版本索引和 changelog 的读取地址。

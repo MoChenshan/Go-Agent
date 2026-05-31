@@ -1,0 +1,369 @@
+# GameOps Agent —— Prometheus AlertManager 规则样板
+#
+# 本文件沉淀 D16/D16.1 所埋点的 6 条 Counter 对应的**生产告警规则**。
+# 使用前置条件：
+#   1. OTLP Metric Exporter 已对接（D19.1 完成）；默认 noop，开启方式：
+#        export OTEL_ENABLED=true
+#        export OTEL_EXPORTER_OTLP_ENDPOINT=http://<otel-collector>:4318
+#        export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf   # 或 grpc
+#      紧急止血可单独关闭 metric：export OTEL_METRICS_DISABLED=1
+#      采集间隔默认 15s（与 Prom scrape 对齐），可用 OTEL_METRICS_INTERVAL 覆盖。
+#   2. 指标名在 Prometheus 侧会按 OTel→Prom 规范转换：`.` → `_`，
+#      故下方表达式均使用 `gameops_*_total` 形式。
+#   3. 服务标签 `service_name="gameops-agent"` 由 OTel Resource 自动附加。
+#
+# 阈值均为**保守起步值**，接真实流量后需根据基线调整，具体调优建议见 docs/observability.md。
+#
+# 导入方式（Prometheus）：
+#   rule_files:
+#     - /etc/prometheus/rules/gameops-agent.yaml
+#
+# 导入方式（VictoriaMetrics vmalert）：
+#   vmalert -rule=/etc/vmalert/rules/gameops-agent.yaml ...
+
+groups:
+  # ============================================================
+  # 1. 安全防护类：输入/输出 Guard 触发频率异常
+  # ============================================================
+  - name: gameops-agent.guard
+    interval: 30s
+    rules:
+      - alert: GameOpsInputGuardBlockedSpike
+        expr: sum by (rule) (rate(gameops_input_guard_blocked_total[5m])) > 10 / 60
+        for: 5m
+        labels:
+          severity: warning
+          component: input_guard
+        annotations:
+          summary: "input_guard 拦截速率异常 (rule={{ $labels.rule }})"
+          description: |
+            最近 5 分钟 input_guard 按规则 `{{ $labels.rule }}` 拦截速率超过 10 次/分钟。
+            可能原因：① 遭到提示词注入攻击；② 规则误伤合法输入；③ 某个上游在批量重试。
+            排查入口：查看最近 10 分钟对应 trace 的 `gen_ai.prompt` 属性（Langfuse/Jaeger）。
+          runbook_url: "https://your-wiki/gameops-agent/runbook/input-guard-spike"
+
+      - alert: GameOpsOutputGuardRedactedHigh
+        expr: sum by (rule) (rate(gameops_guard_redacted_total[10m])) > 5 / 60
+        for: 10m
+        labels:
+          severity: info
+          component: output_guard
+        annotations:
+          summary: "output_guard 脱敏频率偏高 (rule={{ $labels.rule }})"
+          description: |
+            最近 10 分钟 output_guard 按规则 `{{ $labels.rule }}` 脱敏速率 > 5 次/分钟。
+            通常意味着 LLM 产出中频繁带敏感信息（身份证号/手机号/密钥），
+            建议：① 检查系统提示词是否要求脱敏；② 检查 RAG 数据是否包含明文敏感数据。
+
+  # ============================================================
+  # 2. Webhook 入口类：签名失败 / 拒绝率过高
+  # ============================================================
+  - name: gameops-agent.webhook
+    interval: 30s
+    rules:
+      - alert: GameOpsWebhookSignatureFailures
+        expr: sum by (source) (rate(gameops_webhook_requests_total{outcome="signature_failed"}[5m])) > 1 / 60
+        for: 2m
+        labels:
+          severity: critical
+          component: webhook
+        annotations:
+          summary: "Webhook 签名校验失败 (source={{ $labels.source }})"
+          description: |
+            source=`{{ $labels.source }}` 的 webhook 最近 5 分钟持续出现签名校验失败 > 1 次/分钟。
+            可能原因：① 密钥泄漏被第三方尝试探测；② 签名算法/Header 变更；③ 时钟漂移超过容忍窗口。
+            立即排查：查看对应 source 的最近一次成功签名时间；
+            如疑似攻击，优先走 WAF 封 IP，而非改代码。
+
+      - alert: GameOpsWebhookRejectRatioHigh
+        expr: |
+          sum by (source) (rate(gameops_webhook_requests_total{outcome="rejected"}[10m]))
+            /
+          ignoring(outcome) sum by (source) (rate(gameops_webhook_requests_total[10m]))
+            > 0.3
+        for: 15m
+        labels:
+          severity: warning
+          component: webhook
+        annotations:
+          summary: "Webhook 拒绝率 >30% (source={{ $labels.source }})"
+          description: |
+            source=`{{ $labels.source }}` 的 webhook 最近 10 分钟拒绝率持续 > 30%。
+            通常为去重窗口拦截（正常）或规则过严（异常）；
+            请对照 deduper 配置与 schema 变更记录。
+
+      - alert: GameOpsWebhookMalformedSurge
+        expr: sum by (source) (rate(gameops_webhook_requests_total{outcome="malformed"}[5m])) > 5 / 60
+        for: 5m
+        labels:
+          severity: warning
+          component: webhook
+        annotations:
+          summary: "Webhook payload 解析失败激增 (source={{ $labels.source }})"
+          description: |
+            最近 5 分钟 malformed 速率 > 5 次/分钟。
+            强烈怀疑上游（蓝鲸监控/TAPD）payload schema 变更，
+            需比对 src/services/webhook/schema.go 与上游最新文档。
+
+  # ============================================================
+  # 3. LLM 调用类：失败率 / 调用量骤降
+  # ============================================================
+  - name: gameops-agent.llm
+    interval: 30s
+    rules:
+      - alert: GameOpsLLMErrorRatioHigh
+        expr: |
+          sum by (agent) (rate(gameops_agent_llm_calls_total{status="error"}[5m]))
+            /
+          ignoring(status) sum by (agent) (rate(gameops_agent_llm_calls_total[5m]))
+            > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: llm
+        annotations:
+          summary: "LLM 调用失败率 >10% (agent={{ $labels.agent }})"
+          description: |
+            agent=`{{ $labels.agent }}` 最近 5 分钟 LLM 调用失败率超过 10%。
+            高概率原因：① hunyuan-turbo-s 服务侧故障；② 鉴权（OPENAI_API_KEY）过期；
+            ③ 上下文超长被服务端拒。查 trace 里的 `gen_ai.response.error` 属性定位。
+
+      - alert: GameOpsLLMCallRateDrop
+        expr: |
+          sum by (agent) (rate(gameops_agent_llm_calls_total[5m])) == 0
+          and
+          sum by (agent) (rate(gameops_agent_llm_calls_total[30m] offset 30m)) > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "LLM 调用归零 (agent={{ $labels.agent }})"
+          description: |
+            agent=`{{ $labels.agent }}` 在最近 5 分钟调用数为 0，
+            但 30 分钟前有活跃流量。疑似网关/SSE/前端链路中断。
+            优先排查：① Ingress 健康；② 前端 SSE 重连逻辑；③ A2A 协议端口。
+
+  # ============================================================
+  # 4. 工具调用类：HITL 写操作异常频繁
+  # ============================================================
+  - name: gameops-agent.tools
+    interval: 30s
+    rules:
+      - alert: GameOpsToolErrorRatioHigh
+        expr: |
+          sum by (agent, tool) (rate(gameops_agent_tool_calls_total{status="error"}[10m]))
+            /
+          ignoring(status) sum by (agent, tool) (rate(gameops_agent_tool_calls_total[10m]))
+            > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: tool
+        annotations:
+          summary: "工具调用失败率 >20% (agent={{ $labels.agent }}, tool={{ $labels.tool }})"
+          description: |
+            (agent=`{{ $labels.agent }}`, tool=`{{ $labels.tool }}`) 最近 10 分钟错误率 > 20%。
+            若 tool 为 bk_*/bcs_* 类读工具 → 后端服务降级；
+            若 tool 为 gongfeng_*/tapd_*/devops_* 写工具 → 关注鉴权与配额。
+
+      - alert: GameOpsWriteToolBurst
+        expr: |
+          sum by (tool) (rate(gameops_agent_tool_calls_total{
+              tool=~"gongfeng_mr_create|gongfeng_mr_merge|tapd_bug_create|devops_pipeline_rerun|devops_build_cancel",
+              status="ok"
+            }[5m])) > 3 / 60
+        for: 5m
+        labels:
+          severity: warning
+          component: tool
+        annotations:
+          summary: "写操作类工具调用突增 (tool={{ $labels.tool }})"
+          description: |
+            写操作类工具 `{{ $labels.tool }}` 最近 5 分钟成功调用 > 3 次/分钟。
+            正常场景下写操作靠 HITL 两段式确认，理应极低频；
+            突增常意味着：① 自动化脚本误触发；② HITL 闸门被关闭（*_ALLOW_AUTO_*=1 长期开启）。
+
+  # ============================================================
+  # 5. SSE 事件类：用户端体验可观测
+  # ============================================================
+  - name: gameops-agent.sse
+    interval: 30s
+    rules:
+      - alert: GameOpsSSEErrorEventsSpike
+        expr: sum(rate(gameops_sse_events_total{event="error"}[5m])) > 1 / 60
+        for: 5m
+        labels:
+          severity: warning
+          component: sse
+        annotations:
+          summary: "SSE error 事件频发"
+          description: |
+            最近 5 分钟 SSE error 事件速率 > 1 次/分钟。
+            用户侧表现为 "对话中断" 气泡提示，影响 NPS。
+            排查：tail 服务日志中的 panic/recover 栈；比对对应 trace 的 span events。
+
+      - alert: GameOpsSSEConfirmationRequiredStuck
+        expr: |
+          sum(rate(gameops_sse_events_total{event="confirmation_required"}[10m]))
+            /
+          ignoring(event) sum(rate(gameops_sse_events_total[10m]))
+            > 0.5
+        for: 15m
+        labels:
+          severity: info
+          component: sse
+        annotations:
+          summary: "HITL 确认占比过高（>50%）"
+          description: |
+            最近 10 分钟 SSE 流中 `confirmation_required` 事件占比 > 50%。
+            说明用户大量请求触发了 HITL 两段式确认但未继续确认——
+            可能是 ReAct Planner 过度保守，也可能是前端 HITL 弹窗 UX 出问题导致确认率下降。
+            建议：人工抽样 3~5 条 session 查看后续是否有 final 事件。
+
+  # ============================================================
+  # 6. 异步任务类 (D19.2/D19.4)：队列背压 / 超时比例 / 死循环
+  # ============================================================
+  - name: gameops-agent.async
+    interval: 30s
+    rules:
+      - alert: GameOpsAsyncQueueSaturated
+        expr: |
+          (
+            sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome="accepted"}[5m]))
+              -
+            ignoring(outcome) sum by (tool) (rate(gameops_async_jobs_finished_total[5m]))
+          ) > 5 / 60
+        for: 10m
+        labels:
+          severity: warning
+          component: async
+        annotations:
+          summary: "异步队列持续积压 (tool={{ $labels.tool }})"
+          description: |
+            tool=`{{ $labels.tool }}` 的 submitted - finished 速率差持续 > 5/min，
+            说明生产速率高于消费速率，队列正在累积。
+            排查入口：
+              ① 提升 async.max_concurrent（需评估下游承载）；
+              ② 查看该 tool 的 duration histogram p95 是否恶化；
+              ③ 若 rejected 速率同步上升，扩 max_queued 或降低上游触发频率。
+
+      - alert: GameOpsAsyncRejectedSpike
+        expr: sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome="rejected"}[5m])) > 1 / 60
+        for: 5m
+        labels:
+          severity: warning
+          component: async
+        annotations:
+          summary: "异步任务被限流拒绝 (tool={{ $labels.tool }})"
+          description: |
+            tool=`{{ $labels.tool }}` 最近 5 分钟 rejected > 1/min。
+            直接影响：调用方（LLM/Webhook）拿到 ErrTooManyJobs，被迫降级或丢弃。
+            正确处理顺序：先看是否与 QueueSaturated 同时告警 → 是则优先扩并发；
+            否则大概率是瞬时脉冲，调 max_queued 缓冲即可。
+
+      - alert: GameOpsAsyncTimeoutRatioHigh
+        expr: |
+          sum by (tool) (rate(gameops_async_jobs_finished_total{status="timed_out"}[10m]))
+            /
+          ignoring(status) sum by (tool) (rate(gameops_async_jobs_finished_total[10m]))
+            > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          component: async
+        annotations:
+          summary: "异步任务超时率 > 10% (tool={{ $labels.tool }})"
+          description: |
+            tool=`{{ $labels.tool }}` 最近 10 分钟终态为 timed_out 的占比 > 10%。
+            **timed_out 与 cancelled 严格区分**：timed_out = 工具真的慢，需扩 timeout 或优化；
+            cancelled = 用户主动取消，无需告警。混淆两者会让面板失信。
+            排查入口：
+              ① 查看 duration histogram p95/p99；
+              ② 对比工具侧的上游服务（BCS/BK/TAPD）近期延迟；
+              ③ 若为 pod_restart.wait_for_ready，可能是真实业务就绪慢，需调 MaxTimeout。
+
+      - alert: GameOpsAsyncJobDurationP95Regression
+        expr: |
+          histogram_quantile(0.95,
+            sum by (tool, le) (rate(gameops_async_jobs_duration_seconds_bucket[10m]))
+          ) > 60
+        for: 15m
+        labels:
+          severity: warning
+          component: async
+        annotations:
+          summary: "异步任务 p95 延迟 > 60s (tool={{ $labels.tool }})"
+          description: |
+            tool=`{{ $labels.tool }}` 最近 10 分钟 p95 总耗时（含排队）> 60 秒。
+            这是 SLO 性能退化信号，比单次超时更早暴露问题。
+            重点对比：该 tool 的典型历史基线（通常 pod_restart ~ 30s、bcs_pod_list ~ 2s）。
+
+  # ============================================================
+  # 7. 审计远端汇聚类 (D17.3/D17.4)：dropped/failed 表示链路断裂
+  # ============================================================
+  - name: gameops-agent.audit
+    interval: 30s
+    rules:
+      - alert: GameOpsAuditRemoteDropped
+        expr: sum(rate(gameops_audit_remote_dropped_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: audit
+        annotations:
+          summary: "审计记录被背压丢弃（合规风险）"
+          description: |
+            最近 5 分钟有审计记录因 RemoteSink 队列已满而被丢弃。
+            **这是合规红线**：审计链完整性是安全审计的刚性要求，丢弃意味着事后无法追溯。
+            紧急处理顺序：
+              ① 确认远端审计网关是否可达、鉴权是否有效；
+              ② 扩大 RemoteSink buffer（audit.remote.buffer_size）作为临时缓冲；
+              ③ 检查 RemoteSink worker goroutine 是否 panic/死锁。
+
+      - alert: GameOpsAuditRemoteFailed
+        expr: |
+          sum(rate(gameops_audit_remote_failed_total[10m]))
+            /
+          ignoring() sum(rate(gameops_audit_remote_enqueued_total[10m]))
+            > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: audit
+        annotations:
+          summary: "审计远端投递失败率 > 5%"
+          description: |
+            最近 10 分钟审计 failed/enqueued 比例 > 5%。
+            通常为远端网关鉴权/配额/网络抖动；
+            与 Dropped 的区别：Failed 是尝试投递后失败（单条可重试），Dropped 是根本没尝试（队列满）。
+
+      - alert: GameOpsJudgeErrorRatioHigh
+        expr: |
+          sum(rate(gameops_judge_calls_total{status!="ok"}[10m]))
+            /
+          ignoring(status) sum(rate(gameops_judge_calls_total[10m]))
+            > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: judge
+        annotations:
+          summary: "LLM Judge 错误率 > 10%"
+          description: |
+            最近 10 分钟 LLM Judge 调用中 status ∈ {error, timeout, parse_error} 占比 > 10%。
+            Judge 退化意味着 evalrun 评分失真，直接影响 CI 回归的可信度。
+            查 trace 的 gen_ai.judge.raw_response 属性定位具体原因（prompt 漂移 / 模型服务抖动）。
+
+      - alert: GameOpsRuleReloadFailed
+        expr: sum by (kind) (increase(gameops_rule_reload_total{status!~"ok|unchanged"}[30m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: rule
+        annotations:
+          summary: "规则热加载连续失败 (kind={{ $labels.kind }})"
+          description: |
+            kind=`{{ $labels.kind }}` 的规则在 30 分钟内热加载失败 > 2 次。
+            活跃规则仍为上一版本（fail-safe 设计），
+            但运维侧应立即核对 yaml 语法/权限；长期失败会导致"规则变更不生效"的静默事故。

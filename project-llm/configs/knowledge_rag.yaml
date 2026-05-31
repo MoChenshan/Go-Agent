@@ -1,0 +1,96 @@
+# =============================================================================
+# knowledge_rag.yaml —— Agentic RAG 服务统一配置
+# 适用：project-llm/deploy/rag_serve.py
+# =============================================================================
+
+# ---- 检索器 ----
+retriever:
+  # 向量库：Qdrant（本地单机 / 集群可替换为 Milvus）
+  vector_store:
+    type: qdrant
+    url: "${QDRANT_URL:-http://localhost:6333}"
+    collection: "gameops_kb"
+    timeout: 30
+
+  # Embedding：BGE-M3（支持 8k 长文 + 稠密/稀疏/colbert 三合一）
+  embedding:
+    model: "BAAI/bge-m3"
+    device: "cuda"               # cpu / cuda / mps
+    batch_size: 32
+    max_length: 8192
+    dense_weight: 1.0            # 稠密检索权重
+    sparse_weight: 0.3           # 稀疏检索权重（类似 BM25）
+    colbert_weight: 0.0          # colbert 精排权重（0=关闭）
+
+  # Rerank：BGE-Reranker-v2-M3（精排 top-K）
+  reranker:
+    enabled: true
+    model: "BAAI/bge-reranker-v2-m3"
+    top_k: 5                     # 精排后保留条数
+    score_threshold: 0.3         # 低于此分数的切片直接丢弃
+
+  # 检索参数
+  top_k: 20                      # 粗排召回条数
+  chunk_size: 512                # 索引时每段长度
+  chunk_overlap: 64              # 重叠
+  hybrid_search: true            # 稠密 + 稀疏混合
+  mmr_enabled: true              # Maximal Marginal Relevance 多样性
+  mmr_lambda: 0.7
+
+# ---- 生成模型（融合层） ----
+generator:
+  # 指向阶段 D 部署好的 vLLM V1 服务
+  base_url: "${LLM_BASE_URL:-http://localhost:8000/v1}"
+  model: "qwen3-8b-knowledge-sft"
+  api_key: "${LLM_API_KEY:-EMPTY}"
+  temperature: 0.1               # 知识问答建议低温
+  top_p: 0.9
+  max_tokens: 1024
+  timeout: 120
+  # 若上游未 ready，自动降级到 DeepSeek-V3.2
+  fallback:
+    enabled: true
+    base_url: "https://api.deepseek.com/v1"
+    model: "deepseek-chat"
+    api_key: "${DEEPSEEK_API_KEY}"
+
+# ---- Prompt 模板 ----
+prompt:
+  system: |
+    你是 GameOps 运维知识库专家，请严格基于【参考资料】回答用户问题。
+    要求：
+    1. 回答必须有出处，在关键结论后用 [^N] 标注引用的资料编号
+    2. 若【参考资料】无法回答，明确说"资料不足"并给出可能的排查方向
+    3. 对于操作指令类问题，按"步骤 1 / 步骤 2 / 步骤 3"结构化输出
+    4. 禁止编造不存在的命令、告警码、服务名
+
+  user_template: |
+    【参考资料】
+    {context}
+
+    【用户问题】
+    {question}
+
+    请作答：
+
+# ---- 服务 ----
+service:
+  host: "0.0.0.0"
+  port: 8100
+  workers: 2                     # uvicorn worker 数
+  cors_origins: ["*"]
+  # 是否暴露 OpenAI 兼容 /v1/chat/completions 端点
+  openai_compat: true
+  # 是否追加参考资料到 response metadata（方便前端展示）
+  return_citations: true
+
+# ---- 可观测（阶段 G 接入 Langfuse） ----
+observability:
+  langfuse:
+    enabled: false
+    host: "${LANGFUSE_HOST:-https://cloud.langfuse.com}"
+    public_key: "${LANGFUSE_PUBLIC_KEY}"
+    secret_key: "${LANGFUSE_SECRET_KEY}"
+    project: "gameops-rag"
+  metrics:
+    prometheus_port: 9100

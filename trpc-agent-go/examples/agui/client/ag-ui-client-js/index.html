@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>AG-UI 示例</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type="importmap">
+      {
+        "imports": {
+          "@tencent/ag-ui-client-js": "./node_modules/@tencent/ag-ui-client-js/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f1f5f9;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .app {
+        width: min(860px, 100%);
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .app h1 {
+        margin: 0;
+        font-size: 28px;
+        color: #0f172a;
+      }
+      .app p {
+        margin: 0;
+        color: #475569;
+        line-height: 1.6;
+      }
+      .input-box textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 16px;
+        font-size: 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(100, 116, 139, 0.3);
+        resize: vertical;
+        box-sizing: border-box;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      button {
+        padding: 12px 28px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 15px;
+        cursor: pointer;
+        transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+      }
+      button:not([disabled]):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 30px rgba(79, 70, 229, 0.25);
+      }
+      button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .status {
+        font-size: 14px;
+        color: #475569;
+      }
+      .log {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        max-height: 360px;
+        overflow-y: auto;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        padding: 20px;
+        background: rgba(248, 250, 252, 0.6);
+      }
+      .message {
+        padding: 12px 16px;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .message strong {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+      }
+      .message.user {
+        background: rgba(110, 231, 183, 0.2);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+      }
+      .message.assistant {
+        background: rgba(224, 231, 255, 0.5);
+        border: 1px solid rgba(79, 70, 229, 0.4);
+      }
+      .message.tool {
+        background: rgba(191, 219, 254, 0.4);
+        border: 1px dashed rgba(37, 99, 235, 0.6);
+      }
+      .message.info {
+        background: rgba(226, 232, 240, 0.6);
+        border: 1px dotted rgba(100, 116, 139, 0.4);
+      }
+      .message.error {
+        background: rgba(254, 226, 226, 0.7);
+        border: 1px solid rgba(220, 38, 38, 0.7);
+        color: #991b1b;
+      }
+      .message.custom {
+        background: rgba(254, 249, 195, 0.75);
+        border: 1px solid rgba(250, 204, 21, 0.7);
+        color: #92400e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>AG-UI 示例</h1>
+        <p>使用 `@tencent/ag-ui-client-js` 发起对话请求并监听事件。</p>
+      </header>
+      <div class="input-box">
+        <textarea id="prompt" placeholder="请输入要提问的内容">本金10000，复利年化收益率5%，10年后利润是多少？</textarea>
+      </div>
+      <div class="controls">
+        <button id="submit">开始对话</button>
+        <span class="status" id="status">准备就绪。</span>
+      </div>
+      <section class="log" id="log" aria-live="polite"></section>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

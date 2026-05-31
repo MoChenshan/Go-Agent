@@ -1,0 +1,15 @@
+/gameops-agent.exe
+/gameops-agent
+*.exe
+bin/
+coverage.out
+coverage.html
+*.log
+.env
+.idea/
+.vscode/
+go.sum
+vendor/
+dist/
+tmp/
+go.mod.bak

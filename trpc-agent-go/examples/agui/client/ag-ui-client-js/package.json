@@ -1,0 +1,12 @@
+{
+  "name": "ag-ui-browser-demo",
+  "version": "1.0.0",
+  "description": "Static browser demo using @tencent/ag-ui-client-js",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve . --no-clipboard"
+  },
+  "dependencies": {
+    "@tencent/ag-ui-client-js": "^1.0.2"
+  }
+}

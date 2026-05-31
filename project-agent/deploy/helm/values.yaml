@@ -1,0 +1,157 @@
+# ============================================================
+# gameops-agent Helm Values
+# ============================================================
+
+replicaCount: 3
+
+image:
+  repository: gameops-agent
+  tag: ""              # 留空则用 Chart.appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: gameops-agent.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+
+# ----- HPA -----
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  # 自定义指标（需安装 prometheus-adapter）：
+  # 按 Agent 在飞会话数缩放，避免 CPU 滞后
+  customMetrics:
+    enabled: false
+    targetSessionsInFlight: 50
+
+# ----- PDB -----
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2     # 至少保留 2 个副本，保证 HITL 不中断
+
+# ----- RBAC -----
+rbac:
+  create: true        # 启用 ServiceAccount + Role + RoleBinding（最小权限）
+
+# ----- NetworkPolicy -----
+networkPolicy:
+  enabled: true
+  # 仅允许 Ingress 网关 + Prometheus 访问
+  ingressFromNamespaces:
+    - ingress-nginx
+    - monitoring
+  # Egress 仅放行 LLM API / BCS / BK / Redis / OTel
+  allowedEgressCIDRs:
+    - 10.0.0.0/8         # 内网
+  llmEgressDomains:
+    - api.openai.com
+    - api.example-llm.com
+
+# ----- ServiceMonitor (Prometheus Operator) -----
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus
+
+# ----- 应用配置 -----
+config:
+  modelName: hunyuan-turbo-s
+  debug: false
+  session:
+    backend: redis
+    redisAddr: gameops-redis-master.gameops-deps:6379
+    eventThreshold: 20
+  idempotency:
+    backend: redis
+    redisAddr: gameops-redis-master.gameops-deps:6379
+    ttl: 24h
+  otel:
+    enabled: true
+    endpoint: http://otel-collector.gameops-deps:4318
+    sampler: parentbased_traceidratio
+    samplerArg: "0.3"
+
+# ----- Secrets（建议 ExternalSecrets 替代）-----
+secrets:
+  # 由 ExternalSecrets / Vault 注入；此处仅示例
+  openaiApiKey: ""
+  langfusePublicKey: ""
+  langfuseSecretKey: ""
+  auditHmacKey: ""
+
+# ----- 反亲和（避免单节点全挂）-----
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: gameops-agent
+          topologyKey: kubernetes.io/hostname
+
+tolerations: []
+nodeSelector: {}
+
+# ----- terminationGracePeriod 必须 ≥ HITL 等待 + 主动 shutdown 余量 -----
+terminationGracePeriodSeconds: 60

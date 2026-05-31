@@ -1,0 +1,19 @@
+global:
+  namespace: development
+  env_name: test
+
+server:
+  service:
+    - name: trpc.app.agent.joker
+      ip: 127.0.0.1
+      port: 8088
+      network: tcp
+      protocol: http_no_protocol
+      timeout: 0
+
+client:
+  service:
+    - name: trpc.app.client.joker
+      target: ip://127.0.0.1:8088
+      protocol: http 
+      timeout: 0

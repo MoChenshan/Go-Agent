@@ -1,0 +1,68 @@
+# =============================================================================
+# NPC 对话模型 SFT 配置（Qwen3-4B + QLoRA，端侧部署友好）
+# 切换小模型：取消注释 1.7B / 0.6B 的 model_name_or_path
+# 运行：llamafactory-cli train configs/npc_sft.yaml
+# =============================================================================
+
+### 模型配置（端侧优先选小模型，Qwen3 原生支持 thinking mode）
+model_name_or_path: Qwen/Qwen3-4B       # 端侧部署推荐 4B（thinking 实用下限）
+# model_name_or_path: Qwen/Qwen3-1.7B   # 更极端的端侧场景（手机端）
+# model_name_or_path: Qwen/Qwen3-0.6B   # 极致轻量（嵌入式 / 低端手机）
+trust_remote_code: true
+
+### 微调方法
+stage: sft
+do_train: true
+finetuning_type: lora
+
+### QLoRA 量化
+quantization_bit: 4
+quantization_method: bitsandbytes
+double_quantization: true
+quantization_type: nf4
+
+### LoRA 超参
+lora_rank: 32                    # NPC 对话需要更强的拟合能力（风格+人设）
+lora_alpha: 64
+lora_target: all                 # Qwen3 推荐 all-linear 全模块注入
+lora_dropout: 0.05
+use_rslora: true
+
+### 数据配置
+dataset: npc_dialogues
+dataset_dir: ./data
+template: qwen3                  # Qwen3 模板（支持 thinking block 切换）
+cutoff_len: 2048                 # NPC 对话 + thinking 需要更长
+max_samples: 5000
+preprocessing_num_workers: 16
+neat_packing: true
+enable_thinking: true            # 开启 thinking 模式训练（复杂剧情 NPC）
+
+### 训练超参
+num_train_epochs: 5              # 小数据集可多跑几轮
+per_device_train_batch_size: 8
+gradient_accumulation_steps: 2
+learning_rate: 1.0e-4
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+weight_decay: 0.01
+
+### 优化
+optim: adamw_torch_fused
+flash_attn: fa2
+liger_kernel: true
+
+### 日志与输出
+logging_steps: 10
+save_steps: 100
+save_total_limit: 3
+output_dir: ./output/npc_sft
+overwrite_output_dir: true
+report_to: [tensorboard, swanlab]
+bf16: true
+
+### 验证
+val_size: 0.05
+per_device_eval_batch_size: 8
+eval_strategy: steps
+eval_steps: 100

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package trpc.trs.prompt_log_collector;
+
+option go_package = "git.woa.com/trpc-go/trpc-agent-go/trpc/plugin/promptengine/internal/proto";
+
+// This file is the source of truth for the LogCollector service contract.
+// The log_collector repository keeps a read-only mirror at
+// git.woa.com/PromptHub/log_collector/proto/log_collector.proto.
+// Package, service, and message definitions must stay identical across both
+// repositories. Only go_package may differ, so each repository generates its
+// own pb.go and trpc.go files.
+//
+// Change process:
+//   1. Change this file first for any field adjustment.
+//   2. Copy the change to log_collector/proto/log_collector.proto, keeping only
+//      go_package different.
+//   3. Regenerate pb.go and trpc.go in each repository with the tRPC toolchain.
+//   4. Submit both repository changes together so reviewers can audit the contract.
+
+// LogCollector collects prompt execution traces.
+service LogCollector {
+    // reports prompt execution trace data.
+    rpc ReportTrace(ReportTraceRequest) returns (ReportTraceResponse);
+}
+
+// ReportTraceRequest is the request for reporting one trace.
+message ReportTraceRequest {
+    // Caller is the caller service name, formatted as trpc.${app}.${server}.
+    string caller = 1;
+    // TraceJson is the prompt execution trace encoded as JSON.
+    string trace_json = 2;
+    // Token is the business isolation token used to partition trace data.
+    string token = 3;
+}
+
+// ReportTraceResponse is the response for reporting one trace.
+message ReportTraceResponse {
+    // Code is zero on success and non-zero on failure.
+    int32 code = 1;
+    // Message contains the error message when code is non-zero.
+    string message = 2;
+}

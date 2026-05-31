@@ -1,0 +1,361 @@
+# WeCom Channel 配置示例
+# 企业微信 Channel 插件配置示例，支持两种机器人模式
+# 推荐：把敏感值放到 ~/.bashrc 之类的 shell 启动文件里，
+# 然后通过 WECOM_* 环境变量注入 YAML。
+# WebSocket 长连接完整样例可参考仓库里的
+# openclaw/openclaw.wecom.ai.websocket.yaml。
+#
+# 推荐放到 ~/.bashrc：
+#
+# export WECOM_TOKEN='replace-with-your-token'
+# export WECOM_ENCODING_AES_KEY='replace-with-your-43-char-key'
+# export WECOM_AI_CALLBACK_PATH='/wecom/ai/callback'
+# export WECOM_GROUP_SESSION_MODE='shared'  # or isolated
+# export WECOM_NOTIFICATION_CALLBACK_PATH='/wecom/notification/callback'
+# export WECOM_WEBHOOK_URL='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...'
+
+# ============================================
+# 示例 1：消息通知机器人（Notification Bot）
+# ============================================
+# 适用场景：系统告警、通知推送、简单问答
+# 特点：使用固定 webhook_url，简单稳定
+
+notification_bot_example:
+  channels:
+    - type: "wecom"
+      name: "system-alerts"
+      config:
+        # === 机器人类型 ===
+        bot_mode: "notification"  # 必填：notification 或 ai
+
+        # === 基础配置 ===
+        corp_id: "${WECOM_CORP_ID}"      # 企业 ID（可选）
+        agent_id: "${WECOM_AGENT_ID}"    # 应用 AgentID（可选）
+        token: "${WECOM_TOKEN}"          # 回调 Token（必填）
+        encoding_aes_key: "${WECOM_ENCODING_AES_KEY}" # 必填，43 字符
+
+        # === 消息通知机器人专用配置 ===
+        webhook_url: "${WECOM_WEBHOOK_URL}" # 必填
+
+        # === 回调配置 ===
+        callback_path: "${WECOM_NOTIFICATION_CALLBACK_PATH}"
+        # callback_port: 8080                          # 回调端口（可选，0 表示使用共享 mux）
+
+        # === 权限控制 ===
+        chat_policy: "open"               # 权限策略：open（默认）| disabled | allowlist
+        # allow_users:                    # 白名单用户（chat_policy 为 allowlist 时生效）
+        #   - "user001"
+        #   - "user002"
+
+        # === 自定义消息 ===
+        # bot_name: "AlertBot"            # 可改成环境变量 WECOM_BOT_NAME
+
+
+# ============================================
+# 示例 2：智能机器人（AI Bot）
+# ============================================
+# 适用场景：AI 客服、大模型对话、流式回复
+# 特点：使用动态 response_url，支持流式消息
+# 下面这个示例对应 webhook 回调模式。
+
+ai_bot_example:
+  channels:
+    - type: "wecom"
+      name: "ai-assistant"
+      config:
+        # === 机器人类型 ===
+        bot_mode: "ai"  # 必填：notification 或 ai
+
+        # === 基础配置 ===
+        corp_id: "${WECOM_CORP_ID}"
+        agent_id: "${WECOM_AGENT_ID}"
+        token: "${WECOM_TOKEN}"
+        encoding_aes_key: "${WECOM_ENCODING_AES_KEY}"
+
+        # === 智能机器人专用配置 ===
+        connection_mode: "webhook"
+        # aibotid: "replace-with-your-aibotid" # 可改成 WECOM_AIBOTID
+        enable_stream: true               # 启用流式回复（可选，默认 false）
+        enter_chat_welcome: true          # 回复原生欢迎语卡片和快捷问题
+        reply_prefix:
+          enabled: true
+          fields: ["persona", "context", "commands", "hint", "links"]
+          hint: "直接发问题、图片或文件给我"
+          links:
+            - label: "Web IDE"
+              url: "https://ide.example.com/session/${USER}"
+          commands: ["/help", "/persona", "/status"]
+
+        # === 图片/文件 URL 嵌入开关 ===
+        # embed_image_url 控制图片 URL 如何传递给 Agent：
+        #   false（默认）- URL 通过 ContentParts 传递，由 wecom channel
+        #                   先下载并转成图片字节
+        #   true  - URL 嵌入文本消息中，格式：[image_url:URL]
+        #           Agent 需要自己调用 download_file 工具下载
+        embed_image_url: false
+
+        # embed_file_url 控制文件 URL 如何传递给 Agent：
+        #   false（默认）- URL 通过 ContentParts 传递，由 wecom channel
+        #                   先下载；企微加密文件会先解密
+        #   true  - URL 嵌入文本消息中，格式：[file_url:URL]
+        #           Agent 需要自己调用 download_file 工具下载
+        embed_file_url: false
+
+        # === 回调配置 ===
+        callback_path: "${WECOM_AI_CALLBACK_PATH}"
+
+        # === 权限控制 ===
+        chat_policy: "allowlist"          # 建议使用白名单模式
+        allow_users:
+          - "user001"
+          - "user002"
+          - "admin"
+
+        # === 群聊会话范围 ===
+        # shared（默认）: 整个群共享一段机器人会话历史，按群串行。
+        # isolated: 同一个群里每个用户各自维护独立会话。
+        group_session_mode: "${WECOM_GROUP_SESSION_MODE}"
+
+        # === 用户显示名策略 ===
+        # alias_or_name（默认）: 优先显示 alias，再回退 name / userid
+        # name_or_alias: 优先显示 name，再回退 alias / userid
+        # name | alias | id: 强制优先对应字段，不存在时退回 userid
+        # user_label_mode: "alias_or_name"
+
+        # === 自定义消息 ===
+        # bot_name: "AIAssistant"         # 可改成环境变量 WECOM_BOT_NAME
+
+
+# ============================================
+# 示例 3：同时使用两种机器人
+# ============================================
+# 可以在同一个配置文件中同时配置多个 channel
+
+mixed_bots_example:
+  channels:
+    # 通知机器人：用于系统告警
+    - type: "wecom"
+      name: "alerts"
+      config:
+        bot_mode: "notification"
+        token: "${WECOM_TOKEN}"
+        encoding_aes_key: "${WECOM_ENCODING_AES_KEY}"
+        webhook_url: "${WECOM_WEBHOOK_URL}"
+        callback_path: "${WECOM_NOTIFICATION_CALLBACK_PATH}"
+        chat_policy: "open"
+
+    # AI 机器人：用于客服对话
+    - type: "wecom"
+      name: "ai-customer-service"
+      config:
+        bot_mode: "ai"
+        token: "${WECOM_TOKEN}"
+        encoding_aes_key: "${WECOM_ENCODING_AES_KEY}"
+        # aibotid: "replace-with-your-aibotid" # 可改成 WECOM_AIBOTID
+        enable_stream: true
+        enter_chat_welcome: true
+        reply_prefix:
+          enabled: true
+          fields: ["persona", "commands", "hint", "links"]
+          hint: "直接发问题、图片或文件给我"
+          links:
+            - label: "Web IDE"
+              url: "https://ide.example.com/session/${USER}"
+          commands: ["/help", "/persona", "/status"]
+        callback_path: "${WECOM_AI_CALLBACK_PATH}"
+        chat_policy: "allowlist"
+        allow_users:
+          - "support_team_user1"
+          - "support_team_user2"
+
+
+# ============================================
+# 配置字段说明
+# ============================================
+
+# bot_mode（必填）
+# ----------------
+# 机器人类型，决定使用哪种企业微信机器人
+#   - "notification": 消息通知机器人
+#   - "ai": 智能机器人
+
+# token（notification / ai+webhook 必填）
+# ----------------
+# 回调验证 Token，在企业微信后台配置回调时设置
+
+# encoding_aes_key（notification / ai+webhook 必填）
+# ----------------
+# 回调加密密钥，43 字符，在企业微信后台配置回调时生成
+
+# webhook_url（notification 模式必填）
+# ----------------
+# 群机器人 Webhook 地址，用于发送消息
+# 格式：https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+
+# aibotid（ai+websocket 必填，ai+webhook 可选）
+# ----------------
+# 智能机器人 ID，在企业微信后台创建智能机器人后获取
+
+# secret（ai+websocket 必填）
+# ----------------
+# AI Bot WebSocket 长连接密钥
+
+# enable_stream（ai 模式可选，默认 false）
+# ----------------
+# 是否启用流式消息回复（打字机效果）
+
+# enter_chat_welcome（ai 模式可选，默认 true）
+# ----------------
+# 用户点击机器人进入会话时，
+# 是否按企微原生协议回复欢迎语卡片和快捷问题
+
+# callback_path（可选，默认 /wecom/callback）
+# ----------------
+# HTTP 回调路径，建议不同机器人使用不同路径
+
+# callback_port（可选，默认 0）
+# ----------------
+# HTTP 回调监听端口
+#   - 0: 使用共享 mux（推荐）
+#   - >0: 独立端口
+
+# chat_policy（可选，默认 open）
+# ----------------
+# 权限策略
+#   - "open": 所有人可用
+#   - "disabled": 禁止所有人使用
+#   - "allowlist": 仅白名单用户可用
+
+# allow_users（chat_policy 为 allowlist 时生效）
+# ----------------
+# 白名单用户 ID 列表
+
+# group_session_mode（可选，默认 shared）
+# ----------------
+# 控制群聊里的会话范围
+#   - "shared": 同一个群共享一段会话历史
+#   - "isolated": 同一个群里每个用户单独一段会话历史
+
+# user_label_mode（可选，默认 alias_or_name）
+# ----------------
+# 控制群聊里展示用户时优先使用哪个字段
+#   - "alias_or_name": 优先 alias，再回退 name / userid
+#   - "name_or_alias": 优先 name，再回退 alias / userid
+#   - "name": 强制优先 name，不存在时退回 userid
+#   - "alias": 强制优先 alias，不存在时退回 userid
+#   - "id": 直接使用 userid
+
+# user_identity_lookup_command（可选）
+# ----------------
+# 显式指定企微用户身份解析命令路径。
+# 配了就优先使用；不配置时，会从已安装 skills 里自动发现
+# `wecom_user_lookup` capability。
+# 没有命令时，trpc-claw 会完全退化成原始 userid 行为。
+
+# bot_name（可选）
+# ----------------
+# 机器人名称，用于自动去除消息中的 @机器人名称
+
+# reply_prefix（ai 模式可选，默认关闭）
+# ----------------
+# 控制每条普通回复和流式回复开头的固定前缀。
+# 前缀会以单行 `> ... | ... | ...` 形式挂在同一个消息气泡里。
+# 默认字段顺序：
+#   - persona
+#   - commands
+#   - hint
+#   - links
+#
+# enabled: true 可显式开启
+# fields: 可按展示需要调整顺序或裁剪字段
+# hint: 可自定义一段更友好的提示语
+# workspace 字段如显式开启，只显示紧凑标签，
+# 不默认展示完整工作区路径和 Git 根路径。
+# links:
+#   - label: "Web IDE"
+#     url: "https://ide.example.com/session/${USER}"
+# commands:
+#   - "/new"
+#   - "/help"
+#   - "/persona"
+#   - "/status"
+
+# persona_dir（可选）
+# ----------------
+# 自定义人格文件目录。
+# 不配置时默认使用 state_dir/wecom/personas
+
+# session_timeout（可选，默认关闭）
+# ----------------
+# 会话超时时间，超过此时间无消息则自动开始新会话
+#   - 不配置 / "0": 禁用自动分割（会话永不过期）
+#   - "10m": 10 分钟
+#   - "30m": 30 分钟
+
+# aggregate_window（可选，默认 2s）
+# ----------------
+# 消息聚合时间窗口，用于合并同一用户短时间内的多条消息
+# 典型场景：用户在企微中拖入文件并附带文字说明，企微会拆分为两条独立回调
+# 聚合器在窗口内收集这些消息，合并后统一提交给 Agent 处理
+#   - "2s": 2 秒窗口（默认，实测企微拆分间隔约 400ms，2s 留足余量）
+#   - "1s": 1 秒窗口（更快响应，但网络波动时可能漏合并）
+#   - "0": 禁用聚合（每条消息立即独立处理）
+
+
+# ============================================
+# 企业微信后台配置步骤
+# ============================================
+
+# 消息通知机器人：
+# 1. 创建机器人：https://developer.work.weixin.qq.com/document/path/99110
+# 2. 配置回调 URL（必须添加 robot_callback_format=json 参数）：
+#    http://您的域名/wecom/notification/callback?robot_callback_format=json
+# 3. 获取 token 和 encoding_aes_key
+# 4. 获取群机器人 webhook_url
+
+# 智能机器人：
+# 1. 创建智能机器人：https://developer.work.weixin.qq.com/document/path/100719
+# 2. webhook 模式：配置回调 URL（自动使用 JSON 格式）：
+#    http://您的域名/wecom/ai/callback
+# 3. webhook 模式：获取 token 和 encoding_aes_key
+# 4. websocket 模式：按长连接文档获取 aibotid 和 secret
+#    文档：https://developer.work.weixin.qq.com/document/path/101463
+
+
+# ============================================
+# 示例 4：文件解密配置
+# ============================================
+# webhook 模式下，智能机器人发送的文件使用
+# encoding_aes_key 解密。
+#
+# websocket 长连接模式下，图片 / 文件消息会在消息体里携带
+# 独立的 aeskey，应优先使用该 aeskey 解密。
+#
+# 如果 Agent 工具需要独立解密文件，可以在工具配置中
+# 传入对应的密钥：
+#
+# tool_download 插件配置示例：
+#   tools:
+#     - type: "style_download"
+#       config:
+#         encoding_aes_key: "webhook 模式填写 EncodingAESKey"
+#         download_dir: "/tmp/downloads"
+#
+# 文件解密 Go 代码示例：
+#
+#   import "git.woa.com/trpc-go/trpc-agent-go/openclaw/channel/wecom"
+#
+#   // 解析密钥（webhook 模式可传 EncodingAESKey，
+#   // websocket 模式可传消息体里的 aeskey）
+#   aesKey, err := wecom.ParseEncodingAESKey("43字符的EncodingAESKey")
+#
+#   // 下载加密文件
+#   encryptedData := downloadFromURL(fileURL)
+#
+#   // 检测是否需要解密
+#   if wecom.IsWecomFileURL(fileURL) {
+#       decryptedData, err := wecom.DecryptFileWithKey(aesKey, encryptedData)
+#       // 使用 decryptedData
+#   }
+#
+# 参考文档：https://developer.work.weixin.qq.com/document/path/101463

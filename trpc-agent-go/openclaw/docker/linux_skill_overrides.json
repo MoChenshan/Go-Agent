@@ -1,0 +1,106 @@
+{
+  "downloaded_binaries": [
+    {
+      "url": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-7.0.2-amd64-static.tar.xz",
+      "extract": true,
+      "strip_components": 1,
+      "files": [
+        {
+          "source": "ffmpeg",
+          "target": "ffmpeg"
+        },
+        {
+          "source": "ffprobe",
+          "target": "ffprobe"
+        }
+      ]
+    }
+  ],
+  "pip_packages": [
+    {
+      "package": "torch",
+      "install_args": [
+        "--index-url",
+        "https://download.pytorch.org/whl/cpu"
+      ]
+    },
+    {
+      "package": "uv",
+      "bins": ["uv", "uvx"]
+    },
+    {
+      "package": "openai-whisper",
+      "bins": ["whisper"]
+    }
+  ],
+  "npm_packages": [
+    {
+      "package": "@openai/codex",
+      "bins": ["codex"]
+    },
+    {
+      "package": "@google/gemini-cli",
+      "bins": ["gemini"]
+    },
+    {
+      "package": "@steipete/summarize",
+      "bins": ["summarize"]
+    }
+  ],
+  "go_packages": [
+    {
+      "package": "github.com/cli/cli/v2/cmd/gh",
+      "bins": ["gh"]
+    },
+    {
+      "package": "github.com/steipete/camsnap/cmd/camsnap",
+      "bins": ["camsnap"]
+    },
+    {
+      "package": "github.com/steipete/gogcli/cmd/gog",
+      "bins": ["gog"]
+    },
+    {
+      "package": "github.com/steipete/goplaces/cmd/goplaces",
+      "bins": ["goplaces"]
+    },
+    {
+      "package": "github.com/steipete/sag/cmd/sag",
+      "bins": ["sag"]
+    },
+    {
+      "package": "github.com/steipete/songsee/cmd/songsee",
+      "bins": ["songsee"]
+    },
+    {
+      "package": "github.com/steipete/spogo/cmd/spogo",
+      "bins": ["spogo"]
+    },
+    {
+      "git_repo": "https://github.com/openhue/openhue-cli.git",
+      "bins": ["openhue-cli"],
+      "aliases": [
+        {
+          "name": "openhue",
+          "target": "openhue-cli"
+        }
+      ]
+    },
+    {
+      "package": "github.com/Yakitrak/notesmd-cli",
+      "bins": ["notesmd-cli"],
+      "aliases": [
+        {
+          "name": "obsidian-cli",
+          "target": "notesmd-cli"
+        }
+      ]
+    }
+  ],
+  "cargo_packages": [
+    {
+      "package": "himalaya",
+      "bins": ["himalaya"]
+    }
+  ]
+}

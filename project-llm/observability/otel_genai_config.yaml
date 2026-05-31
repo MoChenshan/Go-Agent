@@ -1,0 +1,78 @@
+# =============================================================================
+# OpenTelemetry GenAI Semantic Convention v1.30 配置
+# 用途：对齐业界标准的 GenAI Tracing（gen_ai.system / gen_ai.request.* / gen_ai.usage.*）
+# 接入：opentelemetry-instrumentation-openai>=0.35.0
+# =============================================================================
+
+service:
+  name: project-llm
+  namespace: finetune
+  version: "1.0.0"
+
+resource:
+  attributes:
+    deployment.environment: "dev"        # dev / staging / prod
+    gen_ai.system: "qwen3"
+    gen_ai.operation.name: "chat"
+
+exporters:
+  otlp:
+    endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}"
+    protocol: http/protobuf
+    headers:
+      x-service: project-llm
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # GenAI 特有：PII 脱敏
+  redact_pii:
+    enable: true
+    fields:
+      - gen_ai.prompt
+      - gen_ai.completion
+
+# ---- GenAI Semantic Convention v1.30 关键字段 ----
+genai_attributes:
+  required:
+    - gen_ai.system                      # qwen3 / deepseek / moonshot
+    - gen_ai.request.model               # qwen3-8b / qwen3-4b
+    - gen_ai.operation.name              # chat / completion / embedding
+  recommended:
+    - gen_ai.request.temperature
+    - gen_ai.request.top_p
+    - gen_ai.request.max_tokens
+    - gen_ai.response.id
+    - gen_ai.response.finish_reasons     # stop / length / tool_calls
+    - gen_ai.usage.input_tokens
+    - gen_ai.usage.output_tokens
+  optional:
+    - gen_ai.prompt                      # 默认关闭，开启前需确认合规
+    - gen_ai.completion
+
+# ---- Span 关系约定 ----
+span_kinds:
+  rag:
+    - name: "rag.pipeline"
+      kind: "internal"
+      children:
+        - name: "rag.retrieve"
+          attributes: [rag.query, rag.top_k, rag.reranked]
+        - name: "rag.generate"
+          attributes: [gen_ai.*]
+  agentic:
+    - name: "agent.step"
+      kind: "internal"
+      attributes:
+        - agent.tool_name
+        - agent.iteration
+
+# ---- 采样策略 ----
+sampling:
+  default: 1.0                           # 开发阶段 100% 采样
+  production:
+    ratio: 0.1                           # 生产 10%
+    tail_based:
+      - condition: "gen_ai.response.finish_reasons=='error'"
+        ratio: 1.0                       # 错误请求全采

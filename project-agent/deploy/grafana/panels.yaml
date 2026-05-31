@@ -1,0 +1,172 @@
+#  GameOps Agent —— Grafana 面板声明（YAML → JSON 可重生成）
+#
+# 本文件以**意图级 YAML** 声明 Grafana 面板结构，意在：
+#   1. 评审友好：100 行而非 2000 行，人类可读；
+#   2. 指标 SSOT：指标名从 src/observability/metrics*.go 常量引用（见 gen 约束）；
+#   3. 可重建：未来 gen.go 可以读这份 YAML 输出 dashboards/*.json；
+#      本轮先提供 YAML + 手工维护的一份最小 JSON 骨架（gameops-overview.json）。
+#
+# 面板布局约定：
+#   - row: 逻辑分组标题行
+#   - panels: 2~3 列布局，可拖动；h=8 是 Grafana 默认高度
+#
+# 变量（dashboard variables）：
+#   $source   ∈ { bk_alarm, tapd_webhook }   用于 webhook 类面板切片
+#   $tool     ∈ tool 标签的所有取值           用于 async/tool 类面板切片
+#   $agent    ∈ { coordinator, diagnosis_agent, repair_agent, ... }
+
+datasource: prometheus   # 约定数据源 uid 为 "prometheus"
+
+# ============================================================
+# Dashboard #1: gameops-overview —— 总览（面向日常巡检）
+# ============================================================
+gameops-overview:
+  title: "GameOps Agent · 总览"
+  refresh: 30s
+  time_range: now-1h
+  tags: [gameops, overview]
+
+  rows:
+    - title: "① 入口压力"
+      panels:
+        - title: "Webhook QPS（按来源）"
+          type: timeseries
+          metric: gameops_webhook_requests_total
+          query: |
+            sum by (source) (rate(gameops_webhook_requests_total[1m]))
+          unit: reqps
+          legend: "{{ source }}"
+
+        - title: "Webhook 拒绝率 stacked"
+          type: timeseries
+          query: |
+            sum by (outcome) (rate(gameops_webhook_requests_total[5m]))
+          unit: reqps
+          stack: true
+          description: "outcome=accepted/rejected/malformed/signature_failed 分布"
+
+    - title: "② LLM & Agent 健康"
+      panels:
+        - title: "LLM 调用速率（按 agent × status）"
+          type: timeseries
+          query: |
+            sum by (agent, status) (rate(gameops_agent_llm_calls_total[1m]))
+          unit: reqps
+
+        - title: "LLM 错误率"
+          type: stat
+          query: |
+            sum(rate(gameops_agent_llm_calls_total{status="error"}[5m]))
+              /
+            ignoring(status) sum(rate(gameops_agent_llm_calls_total[5m]))
+          unit: percentunit
+          thresholds: [0.02, 0.05, 0.1]   # 绿/黄/红
+
+        - title: "SSE 事件分布"
+          type: timeseries
+          query: |
+            sum by (event) (rate(gameops_sse_events_total[1m]))
+          legend: "{{ event }}"
+
+    - title: "③ 安全 & 审计"
+      panels:
+        - title: "Guard 拦截（按规则）"
+          type: timeseries
+          query: |
+            sum by (rule) (rate(gameops_input_guard_blocked_total[5m]))
+              + ignoring(rule) group_left()
+            sum by (rule) (rate(gameops_guard_redacted_total[5m]))
+          description: "合并 input_guard 与 output_guard"
+
+        - title: "审计远端 dropped/failed（合规红线）"
+          type: timeseries
+          query: |
+            sum(rate(gameops_audit_remote_dropped_total[5m]))
+            or
+            sum(rate(gameops_audit_remote_failed_total[5m]))
+          unit: reqps
+          thresholds: [0, 0.001]   # 只要非零就报警
+
+    - title: "④ 异步任务概览 (D19.2/D19.4)"
+      panels:
+        - title: "队列水位（submitted − finished 差值速率）"
+          type: timeseries
+          query: |
+            sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome="accepted"}[5m]))
+              -
+            ignoring(outcome) sum by (tool) (rate(gameops_async_jobs_finished_total[5m]))
+          unit: reqps
+          legend: "{{ tool }}"
+
+        - title: "终态分布（stacked）"
+          type: timeseries
+          query: |
+            sum by (status) (rate(gameops_async_jobs_finished_total[5m]))
+          legend: "{{ status }}"
+          stack: true
+
+# ============================================================
+# Dashboard #2: gameops-async-deep —— 深潜（专供 async 故障排查）
+# ============================================================
+gameops-async-deep:
+  title: "GameOps Agent · 异步任务深潜"
+  refresh: 15s
+  time_range: now-3h
+  tags: [gameops, async]
+  variables:
+    - name: tool
+      query: 'label_values(gameops_async_jobs_finished_total, tool)'
+      multi: true
+      includeAll: true
+
+  rows:
+    - title: "① 每工具 p50/p95/p99 延迟"
+      panels:
+        - title: "duration p50 / p95 / p99（by tool）"
+          type: timeseries
+          query: |
+            histogram_quantile(0.50,
+              sum by (tool, le) (rate(gameops_async_jobs_duration_seconds_bucket{tool=~"$tool"}[5m]))
+            )
+          description: "配合 p95 / p99 面板（同组复用，只改 quantile）"
+          unit: s
+
+        - title: "p99 热力图"
+          type: heatmap
+          query: |
+            sum by (le) (rate(gameops_async_jobs_duration_seconds_bucket{tool=~"$tool"}[5m]))
+          description: "跨工具聚合的延迟分布热力图；色块在右上移动表示整体变慢"
+
+    - title: "② 终态构成"
+      panels:
+        - title: "timed_out 比例（关键告警信号）"
+          type: stat
+          query: |
+            sum by (tool) (rate(gameops_async_jobs_finished_total{status="timed_out",tool=~"$tool"}[10m]))
+              /
+            ignoring(status) sum by (tool) (rate(gameops_async_jobs_finished_total{tool=~"$tool"}[10m]))
+          unit: percentunit
+          thresholds: [0.02, 0.05, 0.1]
+
+        - title: "cancelled vs timed_out（区分关键）"
+          type: timeseries
+          query: |
+            sum by (status) (rate(gameops_async_jobs_finished_total{
+              status=~"cancelled|timed_out",tool=~"$tool"
+            }[5m]))
+          description: "两者绝不能混淆：timed_out=真的慢，cancelled=用户主动取消"
+
+    - title: "③ 背压"
+      panels:
+        - title: "rejected 累计（5m）"
+          type: timeseries
+          query: |
+            sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome="rejected",tool=~"$tool"}[5m]))
+          legend: "{{ tool }}"
+
+        - title: "dedup_hit 速率（幂等键命中）"
+          type: timeseries
+          query: |
+            sum by (tool) (rate(gameops_async_jobs_submitted_total{outcome="dedup_hit",tool=~"$tool"}[5m]))
+          legend: "{{ tool }}"
+          description: "高数值通常意味着上游在批量重试——核对告警去重窗口"

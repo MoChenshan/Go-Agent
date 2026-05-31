@@ -1,0 +1,127 @@
+@startuml
+!theme plain
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 20
+skinparam maxmessagesize 60
+
+participant User
+participant Runner
+participant SessionService
+participant "Agent (LLMAgent)" as Agent
+participant "LLM Flow" as Flow
+participant Model
+participant Tool
+
+note over User, Tool: trpc-agent-go Execution Flow
+
+User -> Runner: Send Query\n"What's the capital of France?"
+activate Runner
+
+Runner -> SessionService: GetSession(ctx, sessionKey)
+activate SessionService
+SessionService --> Runner: Return Session (or create new)
+deactivate SessionService
+
+Runner -> Runner: Generate invocationID
+Runner -> Runner: Create userEvent & AppendEvent()
+
+note over Runner: Create Invocation with:\n- Agent\n- Session\n- InvocationID\n- Message\n- EventCompletionCh
+
+Runner -> Agent: agent.Run(ctx, invocation)
+activate Agent
+
+note over Agent: Set invocation context\nRun before agent callbacks
+
+Agent -> Flow: flow.Run(ctx, invocation)
+activate Flow
+
+Flow -> Flow: Prepare system prompt with tools
+Flow -> Model: model.GenerateContent(ctx, request)
+activate Model
+Model --> Flow: Response with FunctionCall
+deactivate Model
+
+Flow -> Flow: Create FunctionCall event\nRequiresCompletion = true
+Flow --> Agent: yield Event(FunctionCall)
+deactivate Flow
+
+note over Agent: Event forwarded to Runner
+
+Agent --> Runner: yield Event(FunctionCall)
+deactivate Agent
+
+note over Runner: Event forwarded to processedEventCh
+
+Runner -> Runner: AppendEvent to session
+Runner -> User: yield Event(FunctionCall)
+deactivate Runner
+
+note over User, Tool: User receives tool call event
+
+note over Runner: Internal: EventCompletionCh <- CompletionID
+
+Runner -> Agent: Resume execution (internal)
+activate Agent
+
+Agent -> Flow: Resume flow execution
+activate Flow
+
+Flow -> Tool: tool.Call(ctx, jsonArgs)
+activate Tool
+Tool --> Flow: {'result': 'Paris'}
+deactivate Tool
+
+Flow -> Flow: Create FunctionResponse event\nRequiresCompletion = true
+Flow --> Agent: yield Event(FunctionResponse)
+deactivate Flow
+
+note over Agent: Event forwarded to Runner
+
+Agent --> Runner: yield Event(FunctionResponse)
+deactivate Agent
+
+note over Runner: Event forwarded to processedEventCh
+
+Runner -> Runner: AppendEvent to session
+Runner -> User: yield Event(FunctionResponse)
+deactivate Runner
+
+note over User, Tool: User receives tool response event
+
+note over Runner: Internal: EventCompletionCh <- CompletionID
+
+Runner -> Agent: Resume execution (internal)
+activate Agent
+
+Agent -> Flow: Resume flow execution
+activate Flow
+
+Flow -> Model: Send tool result for final answer
+activate Model
+Model --> Flow: "The capital of France is Paris."
+deactivate Model
+
+Flow -> Flow: Create final text event
+Flow --> Agent: yield Event(Final Text)
+deactivate Flow
+
+note over Agent: Event forwarded to Runner
+
+Agent --> Runner: yield Event(Final Text)
+deactivate Agent
+
+note over Runner: Event forwarded to processedEventCh
+
+Runner -> Runner: AppendEvent to session
+Runner -> User: yield Event(Final Text)
+deactivate Runner
+
+note over User, Tool: User receives final answer event
+
+note over Runner: Generator exhausted\nEmit runner completion event
+
+Runner -> Runner: Create runnerCompletionEvent\nObjectTypeRunnerCompletion
+Runner -> Runner: AppendEvent to session
+Runner --> User: Return final result
+deactivate Runner
+@enduml

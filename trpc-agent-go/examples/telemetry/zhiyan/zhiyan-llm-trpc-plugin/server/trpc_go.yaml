@@ -1,0 +1,37 @@
+global:
+  namespace: Development
+  env_name: pre
+  container_name: zhiyan_llm_demo
+  local_ip: 127.0.0.1
+  admin_port: 0
+  enable_set: N
+server:
+  app: llm-trpc-go-server
+  server: zhiyan-llm-trpc-plugin
+  service:
+    - name: trpc.app.app.agent
+      ip: 127.0.0.1
+      port: 8080
+      network: tcp
+      protocol: http_no_protocol
+      timeout: 1000000
+plugins:
+  log:
+    default:
+      - writer: console
+        level: info
+  telemetry:
+    zhiyan-llm:
+      # YAML overrides env. You can also set env vars:
+      # - ZHIYANLLM_API_ENDPOINT
+      # - ZHIYANLLM_API_KEY
+      # - ZHIYANLLM_APP_NAME
+      api_endpoint: ${ZHIYANLLM_API_ENDPOINT}
+      api_key: ${ZHIYANLLM_API_KEY}
+      app_name: ${ZHIYANLLM_APP_NAME}
+      # Optional limits (0 means use defaults):
+      attribute_value_length_limit: 4096
+      attribute_count_limit: 128
+      event_count_limit: 128
+      attribute_per_event_count_limit: 128
+

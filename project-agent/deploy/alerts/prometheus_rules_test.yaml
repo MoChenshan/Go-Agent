@@ -1,0 +1,70 @@
+# promtool test rules — 验证 prometheus_rules.yaml 中告警在预期时序下能/不能触发。
+#
+# 用法：
+#   promtool test rules deploy/alerts/prometheus_rules_test.yaml
+#
+# 设计原则：
+#   每条 alert 至少 1 个正向用例（应触发）+ 1 个反向用例（不应触发）。
+#   时间窗口故意选 6m（>5m for-clause），保证 for 表达式触发。
+
+rule_files:
+  - prometheus_rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # ---------- 1. input_guard 拦截 spike ----------
+  - interval: 1m
+    input_series:
+      - series: 'gameops_input_guard_blocked_total{rule="prompt_injection"}'
+        # 6 分钟内累计 +120，速率 = 120 / (5*60) = 0.4 /s = 24/min
+        values: '0 20 40 60 80 100 120'
+      - series: 'gameops_input_guard_blocked_total{rule="benign_pattern"}'
+        # 6 分钟内只 +1，速率远低于阈值
+        values: '0 0 0 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: GameOpsInputGuardBlockedSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: input_guard
+              rule: prompt_injection
+            exp_annotations:
+              summary: "input_guard 拦截速率异常 (rule=prompt_injection)"
+              runbook_url: "https://your-wiki/gameops-agent/runbook/input-guard-spike"
+
+  # ---------- 2. output_guard 脱敏频率（不应触发） ----------
+  - interval: 1m
+    input_series:
+      - series: 'gameops_guard_redacted_total{rule="phone_number"}'
+        values: '0 0 0 0 1 1 1 1 1 1 1 1'  # 12 分钟内只 +1，远低于 5/min
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: GameOpsOutputGuardRedactedHigh
+        exp_alerts: []   # 不应触发
+
+  # ---------- 3. webhook 签名失败 ----------
+  - interval: 1m
+    input_series:
+      - series: 'gameops_webhook_requests_total{source="bk_alarm",outcome="signature_failed"}'
+        # 6 分钟内 +12，速率 = 2/min，远高于 1/min 阈值
+        values: '0 2 4 6 8 10 12'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: GameOpsWebhookSignatureFailures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              component: webhook
+              source: bk_alarm
+
+  # ---------- 4. webhook 签名失败（反向：累计 0） ----------
+  - interval: 1m
+    input_series:
+      - series: 'gameops_webhook_requests_total{source="tapd",outcome="signature_failed"}'
+        values: '0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: GameOpsWebhookSignatureFailures
+        exp_alerts: []

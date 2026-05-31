@@ -1,0 +1,29 @@
+{
+  "figsize": [14, 10],
+  "dpi": 150,
+  "style": "whitegrid",
+  "color_palette": "husl",
+  "font": {
+    "family": "sans-serif",
+    "size": 10
+  },
+  "plots": {
+    "distribution": {
+      "enabled": true,
+      "subplots": ["action", "category", "value", "user"]
+    },
+    "trend": {
+      "enabled": true,
+      "show_daily_counts": true,
+      "show_daily_value": true
+    },
+    "correlation": {
+      "enabled": true,
+      "cmap": "YlOrRd"
+    },
+    "box_plot": {
+      "enabled": true,
+      "show_means": true
+    }
+  }
+}

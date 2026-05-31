@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1.6
+# ============================================================
+# project-llm — 推理镜像（vLLM v1 + EAGLE-3 + LoRA 多租户）
+#
+# 与训练镜像分离：
+#   - 体积更小（只装 vllm/sglang）
+#   - 启动更快（无 deepspeed / trl / accelerate 等大依赖）
+#   - 可独立升级
+# ============================================================
+
+ARG CUDA_VERSION=12.1.1
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-venv python3-pip \
+    curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python
+
+WORKDIR /workspace
+
+# 仅安装推理必需依赖
+RUN pip install --upgrade pip wheel \
+    && pip install \
+        "vllm>=0.7.0" \
+        "sglang>=0.4.0" \
+        "transformers>=4.45.0" \
+        "openai>=1.50.0" \
+        "fastapi>=0.115.0" \
+        "uvicorn[standard]>=0.30.0" \
+        "prometheus-client>=0.21.0"
+
+# RAG 服务相关（仅复制实际存在的文件）
+COPY deploy/rag_serve.py ./rag_serve.py
+COPY infra/inference ./infra/inference
+
+EXPOSE 8000 8001
+
+# 默认作为 vLLM API server。RAG 服务自行覆盖 CMD。
+CMD ["python", "-m", "vllm.entrypoints.openai.api_server", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--model", "/ckpt/serve", \
+     "--enable-lora", \
+     "--max-loras", "8", \
+     "--gpu-memory-utilization", "0.9"]

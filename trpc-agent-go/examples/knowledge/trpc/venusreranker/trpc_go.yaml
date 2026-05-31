@@ -1,0 +1,19 @@
+global:
+  namespace: Production
+  env_name: test
+
+client:
+  timeout: 30000
+  service:
+    - name: trpc.test.venus.reranker
+      target: polaris://trpc.Serving.LingshanRerankerServerEmb.EmbService
+      protocol: http
+      timeout: 60000
+
+plugins:
+  selector:
+    polaris:
+      protocol: grpc
+  registry:
+    polaris:
+      protocol: grpc

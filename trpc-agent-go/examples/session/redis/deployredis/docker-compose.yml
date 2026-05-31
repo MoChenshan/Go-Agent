@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: trpc-agent-go-session-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./users.acl:/usr/local/etc/redis/users.acl:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]

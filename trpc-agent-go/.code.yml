@@ -1,0 +1,41 @@
+branch:
+  trunk_name: "master"
+  branch_type_A:
+    tag:
+      pattern: "v${versionnumber}"
+      versionnumber: "{Major-version}.{Feature-version}.{Fix-version}"
+
+artifact:
+  - path: "/"
+    artifact_name: "trpc-agent-go"
+    dependence_conf: "go.mod"
+    repository_url: "http://git.woa.com/trpc-go/trpc-agent-go"
+    artifact_type: "framework"
+
+source:
+  test_source:
+    filepath_regex:
+      - "^.*_test\\.go$"
+      - "^test/.*"
+      - "^examples/.*"
+      - "^openclaw/test/.*"
+      - "^openclaw/examples/.*"
+  auto_generate_source:
+    filepath_regex:
+      - "^.*\\.pb\\.go$"
+      - "^.*\\.trpc\\.go$"
+      - "^.*_mock\\.go$"
+      - "^.*_mock_test\\.go$"
+      - "^docs/.*"
+      - "^openclaw/.*"
+      - "^trpc/.*"
+      - "^go\\.mod$"
+      - "^go\\.sum$"
+      - "^README\\.md$"
+      - "^CHANGELOG\\.md$"
+      - "^sync_docs_to_iwiki\\.json$"
+  third_party_source:
+    filepath_regex:
+      - "^examples/.*"
+      - "^openclaw/skills/.*"
+      - "^openclaw/plugins/.*"

@@ -1,0 +1,17 @@
+client:
+  service:
+    - name: trpc.agent.knowledge.es
+plugins:
+  database:
+    goes:
+      clientoptions:
+        - name: trpc.agent.knowledge.es               # 和 client 中的 service name 保持一致
+          url: ${ELASTICSEARCH_HOSTS}                 # ES 地址，默认 http://localhost:9200
+          user: ${ELASTICSEARCH_USERNAME}             # 用户名
+          password: ${ELASTICSEARCH_PASSWORD}         # 密码
+          timeout: 1000000                            # 超时时间，单位 ms，默认 1000 ms
+          log:
+            enabled: true                             # 是否开启日志
+            request_enabled: true                     # 是否开启请求日志
+            response_enabled: true                    # 是否开启响应日志
+          enable_trace: true                          # 是否复制 ES 响应供 filter 使用

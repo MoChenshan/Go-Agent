@@ -1,0 +1,92 @@
+name: project-llm CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'project-llm/**'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'project-llm/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project-llm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install lint deps
+        run: |
+          pip install --upgrade pip
+          pip install ruff black isort
+      - name: ruff
+        run: ruff check scripts infra eval deploy observability || true   # 暂不阻塞
+      - name: black --check
+        run: black --check scripts infra eval deploy observability || true
+      - name: isort --check
+        run: isort --check-only scripts infra eval deploy observability || true
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: project-llm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install minimal deps
+        run: |
+          pip install --upgrade pip
+          pip install pytest pyyaml jinja2 numpy
+      - name: smoke test scripts importable
+        run: |
+          python -c "
+          import importlib, pathlib, sys
+          base = pathlib.Path('scripts')
+          ok = True
+          for p in base.glob('*.py'):
+              name = p.stem
+              if name.startswith('_'): continue
+              try:
+                  importlib.import_module(f'scripts.{name}')
+                  print('ok', name)
+              except Exception as e:
+                  print('skip', name, '(', type(e).__name__, str(e)[:80], ')')
+          " || true   # 仅 smoke，不强制阻塞
+      - name: validate yaml configs
+        run: |
+          python -c "
+          import yaml, pathlib, sys
+          err = False
+          for p in pathlib.Path('configs').rglob('*.yaml'):
+              try:
+                  yaml.safe_load(open(p))
+                  print('ok', p)
+              except Exception as e:
+                  print('FAIL', p, e); err = True
+          sys.exit(1 if err else 0)
+          "
+      - name: validate jsonl
+        run: |
+          python -c "
+          import json, pathlib, sys
+          err = False
+          for p in pathlib.Path('eval').rglob('*.jsonl'):
+              for i, line in enumerate(open(p)):
+                  line = line.strip()
+                  if not line: continue
+                  try:
+                      json.loads(line)
+                  except Exception as e:
+                      print('FAIL', p, 'line', i+1, e); err = True
+          sys.exit(1 if err else 0)
+          "

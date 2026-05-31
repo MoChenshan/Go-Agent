@@ -1,0 +1,77 @@
+# ============================================================
+# project-llm 依赖清单（2026 Q1-Q2 主流）
+# Python 3.10+ / CUDA 12.1+ 推荐
+# ============================================================
+
+# ===== 微调框架 =====
+llamafactory>=0.9.0           # 原生支持 Qwen3 / GRPO / Liger Kernel
+ms-swift>=3.0.0               # 阿里 ModelScope 出品，Qwen3 一等公民
+peft>=0.13.0
+transformers>=4.45.0          # 支持 Qwen3
+accelerate>=1.0.0
+bitsandbytes>=0.44.0          # NF4 双重量化
+trl>=0.12.0                   # 原生支持 DPO/SimPO/GRPO/ORPO/KTO
+liger-kernel>=0.4.0           # 融合算子，显存 -20% 速度 +15%
+
+# ===== 数据合成与质量 =====
+openai>=1.50.0                # 合成 + judge（兼容 DeepSeek / Moonshot API）
+datasets>=3.0.0
+rouge-score>=0.1.2
+nltk>=3.9
+simhash>=2.1.0                # chunk 去重
+python-dotenv>=1.0.0          # .env 加载
+
+# ===== 量化工具 =====
+llmcompressor>=0.3.0          # FP8 + GPTQ-Marlin 官方工具
+auto-gptq>=0.8.0
+autoawq>=0.2.6
+optimum>=1.24.0
+
+# ===== 推理引擎 =====
+vllm>=0.7.0                   # V1 引擎 + EAGLE-3 投机解码
+sglang>=0.4.0                 # RadixAttention + EAGLE3
+# tensorrt-llm>=0.15.0        # NVIDIA 官方方案（可选）
+# llama-cpp-python>=0.3.0     # CPU 推理（可选）
+
+# ===== 端侧部署 =====
+executorch>=0.5.0             # PyTorch 官方端侧方案
+mlc-llm>=0.18.0               # 跨平台端侧
+# qai-hub>=0.21.0             # 高通 AI Hub（需商业授权）
+
+# ===== 评估框架（2026 标配三件套）=====
+deepeval>=2.0.0               # G-Eval
+ragas>=0.2.0                  # RAGAS 指标
+langfuse>=2.60.0              # 在线 Trace
+opentelemetry-sdk>=1.27.0
+opentelemetry-instrumentation-openai>=0.35.0  # OTel GenAI Semantic Conv v1.30
+
+# ===== 数据处理 =====
+pandas>=2.2.0
+numpy>=2.0.0
+scikit-learn>=1.5.0
+sentence-transformers>=3.0.0  # BGE-M3 / GTE-Qwen2 embedding
+
+# ===== 训练观测 =====
+tqdm>=4.66.0
+tensorboard>=2.17.0
+swanlab>=0.3.0                # 国内可用的 W&B 替代
+
+# ===== 安全对齐（可选）=====
+guardrails-ai>=0.5.0          # 输入输出防护
+presidio-analyzer>=2.2.0      # PII 检测
+
+# ===== AI Infra 补充（第十章：CUDA 算子 / 分布式训练 / 推理优化）=====
+# CUDA 算子与性能分析
+triton>=3.1.0                 # 手写融合算子（RMSNorm / Attention）
+flash-attn>=2.7.0             # FlashAttention-2（Hopper 可升级到 FA3）
+# nvidia-nsight-compute        # Nsight Compute CLI（随 CUDA 12.x 自带，无需 pip）
+
+# 分布式训练
+deepspeed>=0.15.0             # ZeRO-1/2/3 + Offload + Ulysses 长序列
+# torchtitan                   # PyTorch 官方 FSDP2+TP+PP 统一框架（从源码安装）
+
+# 推理优化 / 端到端压测
+aiohttp>=3.10.0               # 异步并发压测（bench_speculative.py）
+prometheus-client>=0.21.0     # 采集 vLLM /metrics
+matplotlib>=3.9.0             # 画 Pareto 前沿 / Speculative 加速曲线
+py-spy>=0.3.14                # Python 层采样 profiler

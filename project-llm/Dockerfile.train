@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1.6
+# ============================================================
+# project-llm — 训练镜像
+#   - 包含 llamafactory / ms-swift / trl / liger-kernel / deepspeed
+#   - 不含数据，挂载 /data（HuggingFace cache + 训练数据）
+#   - 不含 ckpt，挂载 /ckpt
+# ============================================================
+
+ARG CUDA_VERSION=12.1.1
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=Asia/Shanghai
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-venv python3.10-dev python3-pip \
+    git curl ca-certificates build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3
+
+WORKDIR /workspace
+
+# --- Python deps ---
+COPY requirements.txt ./
+RUN pip install --upgrade pip wheel \
+    && pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install -r requirements.txt
+
+# --- 复制代码（保留 data/ckpt 用挂载，避免镜像膨胀）---
+COPY scripts ./scripts
+COPY configs ./configs
+COPY infra   ./infra
+COPY eval    ./eval
+COPY observability ./observability
+
+# 默认入口：让 docker run --rm 直接进 bash
+CMD ["bash"]

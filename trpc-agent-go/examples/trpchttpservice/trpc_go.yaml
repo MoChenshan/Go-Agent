@@ -1,0 +1,13 @@
+global:                                         # global config
+  namespace: development                     # environment type: production or development  
+  env_name: test                            # environment name
+
+server:                                     # server configuration
+  service:                                  # business service configuration
+    - name: trpc.app.server.agent          # service route name (must match code)
+      ip: 127.0.0.1                        # service listening IP address
+      port: 8088                           # service listening port
+      network: tcp                         # network type (tcp/udp)
+      protocol: http_no_protocol           # application protocol (http_no_protocol for standard HTTP)
+      timeout: 60000                       # request timeout in milliseconds (60s for Agent processing)
+

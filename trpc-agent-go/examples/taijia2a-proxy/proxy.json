@@ -1,0 +1,22 @@
+[
+  {
+    "name": "taiji-agent1",
+    "proxy_agent_card": {
+      "name": "taiji-agent1",
+      "description": "test agent",
+      "skills": [
+        {
+          "id": "01",
+          "name": "Daily Q&A",
+          "examples": [
+            "who are you?"
+          ]
+        }
+      ]
+    },
+    "agent_id": "12344",
+    "remote_target": "http://stream-server-online-hyaide-app.turbotke.production.polaris:81",
+    "path": "/openapi/app_platform/app_create",
+    "authorization": "Bearer <KEY>" 
+  }
+]

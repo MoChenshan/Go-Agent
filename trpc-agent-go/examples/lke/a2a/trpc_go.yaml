@@ -1,0 +1,12 @@
+global:
+  namespace: development
+  env_name: test
+
+server:
+  service:
+    - name: trpc.app.agent.lke
+      ip: 127.0.0.1
+      port: 18901
+      network: tcp
+      protocol: http_no_protocol
+      timeout: 0

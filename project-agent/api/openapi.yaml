@@ -1,0 +1,253 @@
+openapi: 3.0.3
+info:
+  title: GameOps Agent API
+  version: 1.8.1
+  description: |
+    生产级 SRE Agent 对外 API 契约。
+    - SSE 流式：长连接事件流（chat.completion.chunk / tool.response / done / error）
+    - Webhook：蓝鲸告警 / TAPD 单异步触发
+    - Report：拉取自动生成的故障复盘报告
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: http://localhost:8080
+    description: 本地开发
+  - url: https://gameops-agent.example.com
+    description: 生产
+
+paths:
+  /healthz:
+    get:
+      summary: 健康检查
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /v1/agent:
+    post:
+      summary: SSE 流式对话
+      operationId: agentSSE
+      description: |
+        以 SSE（text/event-stream）流式返回 Agent 输出。
+        客户端应订阅以下事件：
+          - chat.completion.chunk: 流式文本 delta
+          - tool.response: 工具调用结果
+          - chat.completion: 完整响应（轮次结束）
+          - error: 异常
+          - done: 整个 session 该轮结束
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRequest'
+      responses:
+        "200":
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: chat.completion.chunk
+                  data: {"choices":[{"delta":{"content":"分析中..."}}]}
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /webhook/bk_alarm:
+    post:
+      summary: 蓝鲸告警 Webhook
+      operationId: bkAlarmWebhook
+      description: |
+        接收蓝鲸告警，自动触发诊断 Agent。
+        请求需带 `X-BK-Signature: <hex(hmac-sha256)>` 头部。
+        相同 alarm_id 的重复请求将被幂等忽略（idempotency window 24h）。
+      parameters:
+        - name: X-BK-Signature
+          in: header
+          required: true
+          schema: { type: string }
+        - name: X-Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BKAlarmEvent'
+      responses:
+        "202":
+          description: 已接受，异步处理
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case_id:    { type: string }
+                  status:     { type: string, enum: [accepted, deduped] }
+        "401":
+          description: 签名校验失败
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /webhook/tapd:
+    post:
+      summary: TAPD 工单 Webhook
+      operationId: tapdWebhook
+      parameters:
+        - name: X-TAPD-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TAPDEvent'
+      responses:
+        "202":
+          description: 已接受
+        "401":
+          description: 签名校验失败
+
+  /v1/report/{case_id}:
+    get:
+      summary: 拉取故障复盘报告
+      operationId: getReport
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: format
+          in: query
+          schema: { type: string, enum: [markdown, json], default: markdown }
+      responses:
+        "200":
+          description: OK
+          content:
+            text/markdown:
+              schema: { type: string }
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        "404":
+          description: case 不存在
+
+  /v1/approval/{case_id}:
+    post:
+      summary: HITL 人工审批
+      operationId: submitApproval
+      description: 用户在 AG-UI / IM 卡片点"批准"/"拒绝"后回调本端点
+      parameters:
+        - name: case_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, approver]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                approver: { type: string, description: 审批人工号 }
+                comment:  { type: string }
+      responses:
+        "200":
+          description: OK，Agent 将异步继续
+
+components:
+  schemas:
+    AgentRequest:
+      type: object
+      required: [user_id, session_id, query]
+      properties:
+        user_id:    { type: string, example: rtx_zhangsan }
+        session_id: { type: string, example: s_20260518_001 }
+        query:      { type: string, example: 帮我看一下 game-svr Pod 重启原因 }
+        context:
+          type: object
+          additionalProperties: true
+
+    BKAlarmEvent:
+      type: object
+      required: [alarm_id, severity, summary]
+      properties:
+        alarm_id:  { type: string }
+        severity:  { type: string, enum: [P0, P1, P2, P3] }
+        summary:   { type: string }
+        labels:
+          type: object
+          additionalProperties: { type: string }
+        timestamp: { type: integer, description: unix epoch seconds }
+
+    TAPDEvent:
+      type: object
+      required: [event, story_id]
+      properties:
+        event:    { type: string, enum: [created, status_changed, commented] }
+        story_id: { type: string }
+        title:    { type: string }
+        status:   { type: string }
+
+    Report:
+      type: object
+      properties:
+        case_id:     { type: string }
+        title:       { type: string }
+        status:      { type: string }
+        created_at:  { type: string, format: date-time }
+        summary:     { type: string }
+        timeline:
+          type: array
+          items: { type: object }
+        tools_used:
+          type: array
+          items: { type: string }
+        cost:
+          type: object
+          properties:
+            tokens_in:  { type: integer }
+            tokens_out: { type: integer }
+            usd:        { type: number }
+
+    Error:
+      type: object
+      properties:
+        code:    { type: integer }
+        message: { type: string }
+        trace_id: { type: string }
+
+  responses:
+    BadRequest:
+      description: 参数错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: 触发限流
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    InternalError:
+      description: 服务端错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
