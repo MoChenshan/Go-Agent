@@ -41,11 +41,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ------------------------------------------------------------
 # Runtime
 # ------------------------------------------------------------
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM alpine:latest
 
 LABEL org.opencontainers.image.title="gameops-agent" \
       org.opencontainers.image.source="https://git.woa.com/trpc-go/gameops-agent" \
       org.opencontainers.image.licenses="Apache-2.0"
+
+RUN addgroup -S nonroot && adduser -S nonroot -G nonroot
 
 WORKDIR /app
 COPY --from=builder /out/gameops-agent /app/gameops-agent

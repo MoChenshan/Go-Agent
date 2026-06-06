@@ -23,7 +23,7 @@ python-dotenv>=1.0.0          # .env 加载
 
 # ===== 量化工具 =====
 llmcompressor>=0.3.0          # FP8 + GPTQ-Marlin 官方工具
-auto-gptq>=0.8.0
+# auto-gptq>=0.8.0              # 量化时按需安装：pip install auto-gptq --no-build-isolation
 autoawq>=0.2.6
 optimum>=1.24.0
 
@@ -35,7 +35,7 @@ sglang>=0.4.0                 # RadixAttention + EAGLE3
 
 # ===== 端侧部署 =====
 executorch>=0.5.0             # PyTorch 官方端侧方案
-mlc-llm>=0.18.0               # 跨平台端侧
+# mlc-llm>=0.18.0              # 端侧部署时按需安装               # 跨平台端侧
 # qai-hub>=0.21.0             # 高通 AI Hub（需商业授权）
 
 # ===== 评估框架（2026 标配三件套）=====
@@ -57,7 +57,7 @@ tensorboard>=2.17.0
 swanlab>=0.3.0                # 国内可用的 W&B 替代
 
 # ===== 安全对齐（可选）=====
-guardrails-ai>=0.5.0          # 输入输出防护
+# guardrails-ai>=0.5.0        # 需 Python<3.12，按需安装          # 输入输出防护
 presidio-analyzer>=2.2.0      # PII 检测
 
 # ===== AI Infra 补充（第十章：CUDA 算子 / 分布式训练 / 推理优化）=====

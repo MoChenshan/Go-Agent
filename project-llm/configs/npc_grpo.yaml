@@ -5,7 +5,7 @@
 # 运行：llamafactory-cli train configs/npc_grpo.yaml
 # =============================================================================
 
-model_name_or_path: ./output/npc_sft_merged
+model_name_or_path: ./output/npc_sft_merged   # 基于 Qwen3.5-4B SFT merged
 trust_remote_code: true
 
 stage: grpo                      # LLaMAFactory 0.9+ 原生支持 GRPO
@@ -27,7 +27,7 @@ use_rslora: true
 ### 数据（仅需 prompts 列表，无需 pairwise 数据）
 dataset: npc_grpo_prompts
 dataset_dir: ./data
-template: qwen3
+template: qwen3_5
 cutoff_len: 2048
 max_samples: 1000
 

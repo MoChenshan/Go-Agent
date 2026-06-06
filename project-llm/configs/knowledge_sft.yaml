@@ -1,11 +1,12 @@
 # =============================================================================
-# 知识库专家模型 SFT 配置（Qwen3-8B + QLoRA + RSLoRA + Liger Kernel）
-# 适用：24GB 显卡（QLoRA 显存 ~9GB + KV + 梯度余量）
+# 知识库专家模型 SFT 配置（Qwen3.5-9B + QLoRA + RSLoRA + Liger Kernel）
+# 适用：24GB 显卡（QLoRA 显存 ~10GB + KV + 梯度余量）
 # 运行：llamafactory-cli train configs/knowledge_sft.yaml
 # =============================================================================
 
-### 模型配置（2026 主流：Qwen3-8B，Apache 2.0，原生 thinking mode）
-model_name_or_path: Qwen/Qwen3-8B
+### 模型配置（Qwen3.5-9B 多模态基座，知识理解更强）
+model_name_or_path: Qwen/Qwen3.5-9B
+# model_name_or_path: Qwen/Qwen3.5-35B-A3B  # MoE 高质量（~10GB QLoRA，服务器推理）
 trust_remote_code: true
 
 ### 微调方法
@@ -30,8 +31,8 @@ use_dora: false                  # DoRA 效果略好但训练慢 30%，按需开
 ### 数据配置
 dataset: knowledge_qa
 dataset_dir: ./data
-template: qwen3                  # Qwen3 专用模板（含 thinking block 处理）
-cutoff_len: 4096                 # Qwen3 原生 32K，运维 QA 取 4K 够用
+template: qwen3_5                # Qwen3.5 专用模板（含 thinking block 处理）
+cutoff_len: 4096                 # Qwen3.5 原生 128K，运维 QA 取 4K 够用
 max_samples: 3000
 preprocessing_num_workers: 16
 neat_packing: true               # 2026 新特性：样本紧凑打包，吞吐量 +30%

@@ -1,13 +1,15 @@
 # =============================================================================
-# NPC 对话模型 SFT 配置（Qwen3-4B + QLoRA，端侧部署友好）
-# 切换小模型：取消注释 1.7B / 0.6B 的 model_name_or_path
+# NPC 对话模型 SFT 配置（Qwen3.5-4B + QLoRA，端侧部署友好）
+# 切换小模型：取消注释 2B / 0.8B 的 model_name_or_path
+# 切换 MoE 高质量：取消注释 35B-A3B（仅服务器推理，不适配端侧）
 # 运行：llamafactory-cli train configs/npc_sft.yaml
 # =============================================================================
 
-### 模型配置（端侧优先选小模型，Qwen3 原生支持 thinking mode）
-model_name_or_path: Qwen/Qwen3-4B       # 端侧部署推荐 4B（thinking 实用下限）
-# model_name_or_path: Qwen/Qwen3-1.7B   # 更极端的端侧场景（手机端）
-# model_name_or_path: Qwen/Qwen3-0.6B   # 极致轻量（嵌入式 / 低端手机）
+### 模型配置（Qwen3.5 多模态基座，纯文本 SFT 同样受益）
+model_name_or_path: Qwen/Qwen3.5-4B       # 端侧部署推荐 4B
+# model_name_or_path: Qwen/Qwen3.5-2B     # 更极端的端侧场景（手机端）
+# model_name_or_path: Qwen/Qwen3.5-0.8B   # 极致轻量（嵌入式 / 低端手机）
+# model_name_or_path: Qwen/Qwen3.5-35B-A3B # MoE 高质量（服务器推理，不适配端侧）
 trust_remote_code: true
 
 ### 微调方法
@@ -31,7 +33,7 @@ use_rslora: true
 ### 数据配置
 dataset: npc_dialogues
 dataset_dir: ./data
-template: qwen3                  # Qwen3 模板（支持 thinking block 切换）
+template: qwen3_5                # Qwen3.5 模板（ReasoningTemplate，支持 thinking）
 cutoff_len: 2048                 # NPC 对话 + thinking 需要更长
 max_samples: 5000
 preprocessing_num_workers: 16

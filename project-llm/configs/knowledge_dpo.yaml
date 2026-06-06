@@ -5,7 +5,7 @@
 # =============================================================================
 
 ### 基于 SFT 后的模型继续 DPO
-model_name_or_path: Qwen/Qwen3-8B
+model_name_or_path: Qwen/Qwen3.5-9B
 adapter_name_or_path: ./output/knowledge_sft   # 加载 SFT LoRA
 trust_remote_code: true
 
@@ -30,7 +30,7 @@ use_rslora: true
 ### 数据配置
 dataset: knowledge_dpo
 dataset_dir: ./data
-template: qwen3
+template: qwen3_5
 cutoff_len: 4096
 max_samples: 2000
 

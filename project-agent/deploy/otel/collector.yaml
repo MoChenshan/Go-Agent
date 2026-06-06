@@ -2,6 +2,7 @@
 #
 # 接收 Agent 发来的 OTLP（gRPC/HTTP），输出到：
 #   - Jaeger（traces）
+#   - Langfuse（traces，LLM Token 用量追踪）
 #   - Prometheus 抓取（metrics，via prometheus exporter）
 #   - 控制台（debug，可调）
 
@@ -35,6 +36,13 @@ exporters:
     tls:
       insecure: true
 
+  # Traces → Langfuse（OTLP/HTTP ingestion）
+  # Langfuse v2 在 /api/public/otel/v1/traces 接收 OTLP HTTP
+  otlphttp/langfuse:
+    endpoint: http://langfuse:3000/api/public/otel
+    headers:
+      Authorization: "Bearer ${LANGFUSE_SECRET_KEY}"
+
   # Metrics → 暴露 :8889/metrics 给 Prometheus 抓
   prometheus:
     endpoint: 0.0.0.0:8889
@@ -48,7 +56,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, attributes/redact, batch]
-      exporters: [otlp/jaeger]
+      exporters: [otlp/jaeger, otlphttp/langfuse]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]

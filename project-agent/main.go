@@ -49,7 +49,36 @@ var (
 	flagDebug  = flag.Bool("debug", false, "开启调试模式（输出工具参数、Token 用量等）")
 )
 
+// loadDotEnv 从同目录 .env 文件加载环境变量（不覆盖已存在的）。
+// docker compose 会自动加载 .env，本地 go run 时需要手动加载。
+func loadDotEnv() {
+	f, err := os.Open(".env")
+	if err != nil {
+		return // 文件不存在不报错，兼容无 .env 的场景
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		// 不覆盖已存在的环境变量（shell 显式设置的优先级更高）
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
+}
+
 func main() {
+	loadDotEnv()
 	flag.Parse()
 
 	cfg, err := config.Load(*flagConfig)
@@ -58,6 +87,8 @@ func main() {
 	}
 	if *flagModel != "" {
 		cfg.Model.Name = *flagModel
+	} else if v := os.Getenv("MODEL_NAME"); v != "" {
+		cfg.Model.Name = v
 	}
 	if *flagDebug {
 		cfg.Debug = true

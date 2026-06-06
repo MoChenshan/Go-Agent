@@ -5,7 +5,7 @@
 # =============================================================================
 
 ### 基于 SFT 后的模型继续 DPO
-model_name_or_path: Qwen/Qwen3-4B
+model_name_or_path: Qwen/Qwen3.5-4B
 adapter_name_or_path: ./output/npc_sft  # 加载 SFT 的 LoRA 权重
 trust_remote_code: true
 
@@ -30,7 +30,7 @@ use_rslora: true
 ### 数据
 dataset: npc_dpo
 dataset_dir: ./data
-template: qwen3
+template: qwen3_5
 cutoff_len: 2048
 max_samples: 3000
 
