@@ -34,7 +34,7 @@ use_rslora: true
 dataset: npc_dialogues
 dataset_dir: ./data
 template: qwen3                # Qwen3 模板（支持 thinking）
-cutoff_len: 2048                 # NPC 对话 + thinking 需要更长
+cutoff_len: 1024                 # 降低序列长度节省显存
 max_samples: 5000
 preprocessing_num_workers: 16
 neat_packing: true
@@ -42,8 +42,8 @@ enable_thinking: true            # 开启 thinking 模式训练（复杂剧情 N
 
 ### 训练超参
 num_train_epochs: 5              # 小数据集可多跑几轮
-per_device_train_batch_size: 8
-gradient_accumulation_steps: 2
+per_device_train_batch_size: 1    # 降低 batch size 避免 OOM
+gradient_accumulation_steps: 16   # 增加梯度累积保持总 batch size
 learning_rate: 1.0e-4
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
@@ -65,6 +65,6 @@ bf16: true
 
 ### 验证
 val_size: 0.05
-per_device_eval_batch_size: 8
+per_device_eval_batch_size: 1
 eval_strategy: steps
 eval_steps: 100
