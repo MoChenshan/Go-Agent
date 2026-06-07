@@ -160,10 +160,11 @@ if [[ "${SKIP_SFT:-0}" != "1" && "$SMOKE" != "1" ]]; then
     echo ""
     echo "========== [3] 合并 SFT LoRA =========="
     llamafactory-cli export \
-        --model_name_or_path Qwen/Qwen3.5-4B \
+        --model_name_or_path Qwen/Qwen3-4B \
         --adapter_name_or_path "$SFT_DIR" \
         --export_dir "$SFT_MERGED" \
         --finetuning_type lora \
+        --template qwen3 \
         --trust_remote_code
 else
     echo "[skip] SFT (SMOKE 或 SKIP_SFT=1)"
