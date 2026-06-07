@@ -6,8 +6,8 @@
 #   - 不含 ckpt，挂载 /ckpt
 # ============================================================
 
-ARG CUDA_VERSION=12.1.1
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-devel-ubuntu22.04
+ARG CUDA_VERSION=12.8.1
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn9-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -16,18 +16,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Shanghai
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3.10-venv python3.10-dev python3-pip \
+    python3.12 python3.12-venv python3.12-dev python3-pip \
     git curl ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.10 /usr/bin/python \
-    && ln -sf /usr/bin/python3.10 /usr/bin/python3
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python3
 
 WORKDIR /workspace
 
 # --- Python deps ---
 COPY requirements.txt ./
 RUN pip install --upgrade pip wheel \
-    && pip install torch==2.4.1 torchvision==0.19.1 --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128 \
     && pip install -r requirements.txt
 
 # --- 复制代码（保留 data/ckpt 用挂载，避免镜像膨胀）---

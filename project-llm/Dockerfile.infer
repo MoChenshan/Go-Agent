@@ -8,8 +8,8 @@
 #   - 可独立升级
 # ============================================================
 
-ARG CUDA_VERSION=12.1.1
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn8-runtime-ubuntu22.04
+ARG CUDA_VERSION=12.8.1
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn9-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -17,17 +17,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3.10-venv python3-pip \
+    python3.12 python3.12-venv python3-pip \
     curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3.10 /usr/bin/python
+    && ln -sf /usr/bin/python3.12 /usr/bin/python
 
 WORKDIR /workspace
 
 # 仅安装推理必需依赖
 RUN pip install --upgrade pip wheel \
+    && pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128 \
     && pip install \
-        "vllm>=0.7.0" \
+        "vllm>=0.8.0" \
         "sglang>=0.4.0" \
         "transformers>=4.45.0" \
         "openai>=1.50.0" \

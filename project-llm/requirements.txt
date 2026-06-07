@@ -1,7 +1,12 @@
 # ============================================================
-# project-llm 依赖清单（2026 Q1-Q2 主流）
-# Python 3.10+ / CUDA 12.1+ 推荐
+# project-llm 依赖清单（适配 AutoDL PyTorch 2.8.0 / Python 3.12 / CUDA 12.8）
+# AutoDL 镜像：PyTorch / 2.8.0 / 3.12(ubuntu22.04) / 12.8
 # ============================================================
+
+# ===== PyTorch（版本要求，实际安装在 Dockerfile 中处理）=====
+# PyTorch 2.8.0 + CUDA 12.8 在 Dockerfile 中安装
+torch>=2.8.0
+torchvision>=0.23.0
 
 # ===== 微调框架 =====
 llamafactory>=0.9.0           # 原生支持 Qwen3 / GRPO / Liger Kernel

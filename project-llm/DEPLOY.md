@@ -26,7 +26,7 @@
 
 | 依赖 | 版本 |
 |---|---|
-| Python | ≥ 3.10 |
+| Python | ≥ 3.12 |
 | pip / wheel | 最新 |
 | `.env` 凭据 | 见 [.env.example](.env.example) |
 
@@ -35,9 +35,9 @@
 | 依赖 | 版本 |
 |---|---|
 | OS | Ubuntu 22.04 / CentOS 7+ |
-| NVIDIA 驱动 | ≥ 535（CUDA 12.1 兼容） |
-| CUDA | 12.1 |
-| cuDNN | 8 |
+| NVIDIA 驱动 | ≥ 560（CUDA 12.8 兼容） |
+| CUDA | 12.8 |
+| cuDNN | 9 |
 | NVIDIA Container Toolkit | 最新 |
 | Docker | ≥ 20.10 |
 
@@ -48,7 +48,7 @@
 | pip 源 | `https://mirrors.tencent.com/pypi/simple` | `https://pypi.org/simple` 或阿里源 |
 | HuggingFace | `HF_ENDPOINT=https://hf-mirror.com`（已写在 .env.example） | 直连 huggingface.co |
 | LLM API（合成 / 评测 judge） | 混元 / 内部代理 | DeepSeek / Moonshot / OpenAI |
-| Docker 基础镜像 | `mirrors.tencent.com/library/nvidia/cuda:12.1.1-...` | `nvidia/cuda:12.1.1-...`（docker.io） |
+| Docker 基础镜像 | `mirrors.tencent.com/library/nvidia/cuda:12.8.1-...` | `nvidia/cuda:12.8.1-...`（docker.io） |
 
 ---
 
@@ -58,7 +58,7 @@
 
 ```bash
 # 1) Python 环境
-conda create -n project-llm python=3.10 -y
+conda create -n project-llm python=3.12 -y
 conda activate project-llm
 
 # 2) 装依赖（去掉 GPU-only 包）
@@ -97,10 +97,10 @@ sudo apt update && sudo apt install -y build-essential git curl
 nvidia-smi   # 必须能看到 GPU
 
 # 1) Python + Torch（与 requirements.txt 对齐）
-conda create -n project-llm python=3.10 -y
+conda create -n project-llm python=3.12 -y
 conda activate project-llm
-pip install torch==2.4.1 torchvision==0.19.1 \
-    --index-url https://download.pytorch.org/whl/cu121
+pip install torch==2.8.0 torchvision==0.23.0 \
+    --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
 
 # 2) 配 .env
@@ -227,7 +227,7 @@ vLLM 暴露的是 OpenAI 兼容协议，agent 端零改动即可对接。
 
 | 现象 | 可能原因 | 处理 |
 |---|---|---|
-| `pip install` 卡在 `flash-attn` | 没有 GPU 或 CUDA 不匹配 | CPU 子集场景：`pip uninstall flash-attn`；GPU 场景：检查 `nvidia-smi` 与 CUDA 12.1 |
+| `pip install` 卡在 `flash-attn` | 没有 GPU 或 CUDA 不匹配 | CPU 子集场景：`pip uninstall flash-attn`；GPU 场景：检查 `nvidia-smi` 与 CUDA 12.8 |
 | `llamafactory-cli train` 报 `No module named 'bitsandbytes'` | bnb 在 Windows 装不上 | 必须 Linux + GPU |
 | vLLM 起来但 `--served-model-name` 不一致 | agent 调用时 `MODEL_NAME` 对不上 | 二者保持完全一致 |
 | Docker compose 找不到 GPU | NVIDIA Container Toolkit 没装 / 没重启 docker | `sudo systemctl restart docker` |
