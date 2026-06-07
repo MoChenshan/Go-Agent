@@ -162,7 +162,7 @@ kubectl get nodes
 | LLM API | DeepSeek + Moonshot（`.env.example` 已配置） |
 | pip 源 | `pypi.org` 或阿里源 |
 | HuggingFace | `hf-mirror.com`（已配 `HF_ENDPOINT`） |
-| 训练观测 | SwanLab（国内可用） |
+| 训练观测 | TensorBoard（本地） |
 
 ---
 

@@ -5,7 +5,7 @@
 # 运行：llamafactory-cli train configs/npc_grpo.yaml
 # =============================================================================
 
-model_name_or_path: ./output/npc_sft_merged   # 基于 Qwen3.5-4B SFT merged
+model_name_or_path: ./output/npc_sft_merged   # 基于 Qwen3-4B SFT merged
 trust_remote_code: true
 
 stage: grpo                      # LLaMAFactory 0.9+ 原生支持 GRPO
@@ -27,7 +27,7 @@ use_rslora: true
 ### 数据（仅需 prompts 列表，无需 pairwise 数据）
 dataset: npc_grpo_prompts
 dataset_dir: ./data
-template: qwen3_5
+template: qwen3
 cutoff_len: 2048
 max_samples: 1000
 
@@ -51,8 +51,8 @@ lr_scheduler_type: cosine
 warmup_ratio: 0.1
 
 ### 优化
-flash_attn: fa2
-liger_kernel: true
+flash_attn: sdpa                 # SDPA（PyTorch 2.10.0 兼容）
+# liger_kernel: true             # 当前 llamafactory 版本不支持
 
 ### 日志与输出
 logging_steps: 5
@@ -60,5 +60,5 @@ save_steps: 50
 save_total_limit: 2
 output_dir: ./output/npc_grpo
 overwrite_output_dir: true
-report_to: [tensorboard, swanlab]
+report_to: "tensorboard"         # 移除 swanlab
 bf16: true

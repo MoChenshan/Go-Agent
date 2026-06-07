@@ -147,7 +147,8 @@ python scripts/generate_dialogue.py \
 llamafactory-cli train configs/npc_sft.yaml
 llamafactory-cli export --model_name_or_path Qwen/Qwen3-4B \
     --adapter_name_or_path ./output/npc_sft \
-    --export_dir ./output/npc_sft_merged --finetuning_type lora
+    --export_dir ./output/npc_sft_merged --finetuning_type lora \
+    --template qwen3
 
 # Step 3. DPO 偏好对构造 + DPO 训练（主线）
 python scripts/generate_preference.py \

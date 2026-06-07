@@ -217,7 +217,7 @@ vLLM 暴露的是 OpenAI 兼容协议，agent 端零改动即可对接。
 | 数据合成 LLM | `DEEPSEEK_API_KEY` / `MOONSHOT_API_KEY` / `OPENAI_API_KEY` |
 | HuggingFace 镜像 | `HF_ENDPOINT=https://hf-mirror.com`（推荐内网） |
 | Embedding 模型 | `EMBED_MODEL=BAAI/bge-m3` |
-| 训练观测 | `SWANLAB_API_KEY` / `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` |
+| 训练观测 | `WANDB_API_KEY` / `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` |
 | 可观测性 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` |
 | GPU | `CUDA_VISIBLE_DEVICES` / `USE_FA3`（Hopper 才开） |
 
@@ -241,4 +241,4 @@ vLLM 暴露的是 OpenAI 兼容协议，agent 端零改动即可对接。
 - ❌ `.env` 不入库（已在 `.gitignore`）
 - ❌ HuggingFace token、API key 不提交到仓库
 - ✅ 训练产物（`ckpt/`、`output/`）按公司模型管理规范存放，**不**入 git
-- ✅ Langfuse / SwanLab 用最小可见域；OTel exporter 默认 `localhost`
+- ✅ Langfuse / WanDB 用最小可见域；OTel exporter 默认 `localhost`

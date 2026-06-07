@@ -118,6 +118,7 @@ if [[ "${SKIP_TRAIN:-0}" != "1" ]]; then
         --adapter_name_or_path ./output/knowledge_sft \
         --export_dir ./output/knowledge_sft_merged \
         --finetuning_type lora \
+        --template qwen3 \
         --trust_remote_code
 fi
 
