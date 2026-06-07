@@ -52,7 +52,7 @@ weight_decay: 0.01
 ### 优化
 optim: adamw_torch_fused
 flash_attn: fa2
-liger_kernel: true
+# liger_kernel: true  # 当前 llamafactory 版本不支持，已注释
 
 ### 日志与输出
 logging_steps: 10
