@@ -1,11 +1,11 @@
 # ============================================================
-# project-llm 依赖清单（适配 AutoDL PyTorch 2.8.0 / Python 3.12 / CUDA 12.8）
-# AutoDL 镜像：PyTorch / 2.8.0 / 3.12(ubuntu22.04) / 12.8
+# project-llm 依赖清单（适配 AutoDL PyTorch 2.10.0 / Python 3.12 / CUDA 12.8）
+# AutoDL 镜像：PyTorch / 2.10.0 / 3.12(ubuntu22.04) / 12.8
 # ============================================================
 
 # ===== PyTorch（需单独安装，见下方安装说明）=====
-# PyTorch 2.8.0 + CUDA 12.8 需要从 PyTorch 官方源安装
-# 安装命令：pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+# PyTorch 2.10.0 + CUDA 12.8 需要从 PyTorch 官方源安装
+# 安装命令：pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu128
 # 注意：不要将 torch 加入 requirements.txt，因为需要指定 --index-url
 
 # ===== 微调框架 =====
