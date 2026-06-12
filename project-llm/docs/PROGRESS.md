@@ -81,11 +81,11 @@ project-llm/
 
 | # | 文件 | 功能 | 关键技术点 |
 |---|------|------|-----------|
-| 1 | [scripts/generate_qa.py](scripts/generate_qa.py) | DeepSeek 合成 QA + Magpie 扩增 | 3-5 条/文档、JSON 鲁棒解析、重试退避 |
-| 2 | [scripts/data_quality.py](scripts/data_quality.py) | 五步过滤管道 | 规则→SimHash→BGE-M3→LLM Judge→RAGAS |
-| 3 | [scripts/format_data.py](scripts/format_data.py) | 转 ShareGPT 格式 | 对齐 LLaMAFactory dataset_info |
-| 4 | [scripts/evaluate.py](scripts/evaluate.py) | G-Eval + RAGAS + Langfuse | 4 种推理后端（HF/vLLM/sglang/OpenAI） |
-| 5 | [scripts/run_knowledge_pipeline.sh](scripts/run_knowledge_pipeline.sh) | 一键流水线 | 支持 SMOKE/SKIP 环境变量 |
+| 1 | [scripts/generate_qa.py](../scripts/generate_qa.py) | DeepSeek 合成 QA + Magpie 扩增 | 3-5 条/文档、JSON 鲁棒解析、重试退避 |
+| 2 | [scripts/data_quality.py](../scripts/data_quality.py) | 五步过滤管道 | 规则→SimHash→BGE-M3→LLM Judge→RAGAS |
+| 3 | [scripts/format_data.py](../scripts/format_data.py) | 转 ShareGPT 格式 | 对齐 LLaMAFactory dataset_info |
+| 4 | [scripts/evaluate.py](../scripts/evaluate.py) | G-Eval + RAGAS + Langfuse | 4 种推理后端（HF/vLLM/sglang/OpenAI） |
+| 5 | [scripts/run_knowledge_pipeline.sh](../scripts/run_knowledge_pipeline.sh) | 一键流水线 | 支持 SMOKE/SKIP 环境变量 |
 | 6 | `scripts/memory_profile.py` | 显存 profile | QLoRA NF4 / FP8 / BF16 对比 |
 
 ### Mock 数据
@@ -115,14 +115,14 @@ gold test 规模 : 6
 
 | # | 文件 | 功能 | 亮点 |
 |---|------|------|------|
-| 1 | [scripts/generate_dialogue.py](scripts/generate_dialogue.py) | 多角色多场景对话合成 | **4 类场景**：基础 8 / 情绪 3 / 操作指令 3 / Thinking 3 |
-| 2 | [scripts/generate_preference.py](scripts/generate_preference.py) | DPO 偏好对构造 | 双 temperature 采样 + **异源 LLM Judge** |
-| 3 | [scripts/grpo_rewards.py](scripts/grpo_rewards.py) | GRPO 自定义 reward | **5 种组合 reward**（format/scenario/action/length/role） |
+| 1 | [scripts/generate_dialogue.py](../scripts/generate_dialogue.py) | 多角色多场景对话合成 | **4 类场景**：基础 8 / 情绪 3 / 操作指令 3 / Thinking 3 |
+| 2 | [scripts/generate_preference.py](../scripts/generate_preference.py) | DPO 偏好对构造 | 双 temperature 采样 + **异源 LLM Judge** |
+| 3 | [scripts/grpo_rewards.py](../scripts/grpo_rewards.py) | GRPO 自定义 reward | **5 种组合 reward**（format/scenario/action/length/role） |
 | 4 | `data/raw/npc_profiles.json` | 3 个角色卡 | 铁匠老张/药师小月/老板娘玛莎 |
 | 5 | `data/raw/world_setting.md` | 艾瑞恩大陆世界观 | 支持 NPC 引用背景故事 |
 | 6 | `data/test/npc_test.json` | 5 条 gold test | 含操作指令 + thinking 各 1 条 |
 | 7 | `data/processed/npc_grpo_prompts.json` | GRPO prompts | 带 reward 额外列（npc_profiles 等） |
-| 8 | [scripts/run_npc_pipeline.sh](scripts/run_npc_pipeline.sh) | 端到端流水线 | SFT→DPO/GRPO 双分支→三路对比 |
+| 8 | [scripts/run_npc_pipeline.sh](../scripts/run_npc_pipeline.sh) | 端到端流水线 | SFT→DPO/GRPO 双分支→三路对比 |
 
 ### 设计亮点（面试必讲）
 
@@ -160,13 +160,13 @@ Thinking : <think>...</think> + answer              → 推理链能力
 
 | # | 文件 | 状态 | 亮点 |
 |---|------|------|------|
-| 1 | [deploy/vllm_v1_server.sh](deploy/vllm_v1_server.sh) | ✅ 升级 | **4 档 profile**：bf16/fp8/gptq_marlin/**fp8_eagle3**，一键切换 |
-| 2 | [scripts/quantize_fp8.py](scripts/quantize_fp8.py) | ✅ | llmcompressor FP8_DYNAMIC / FP8_STATIC |
-| 3 | [scripts/quantize_gptq_marlin.py](scripts/quantize_gptq_marlin.py) | ✅ | GPTQModifier W4A16 + 自动 Marlin kernel |
-| 4 | [scripts/benchmark_serving.py](scripts/benchmark_serving.py) | ✅ | httpx+asyncio 并发压测，测 TTFT/TPOT/吞吐 |
-| 5 | [deploy/eagle3_draft.md](deploy/eagle3_draft.md) | ✅ | EAGLE-3 原理与接入指引，含自训 draft 方案 |
-| 6 | [eval/perf_report.md](eval/perf_report.md) | ✅ | benchmark 报告模板（等实机追写）|
-| 7 | [scripts/run_perf_benchmark.sh](scripts/run_perf_benchmark.sh) | ✅ | **一键四档对比**：自动启停 vLLM + 压测 |
+| 1 | [deploy/vllm_v1_server.sh](../deploy/vllm_v1_server.sh) | ✅ 升级 | **4 档 profile**：bf16/fp8/gptq_marlin/**fp8_eagle3**，一键切换 |
+| 2 | [scripts/quantize_fp8.py](../scripts/quantize_fp8.py) | ✅ | llmcompressor FP8_DYNAMIC / FP8_STATIC |
+| 3 | [scripts/quantize_gptq_marlin.py](../scripts/quantize_gptq_marlin.py) | ✅ | GPTQModifier W4A16 + 自动 Marlin kernel |
+| 4 | [scripts/benchmark_serving.py](../scripts/benchmark_serving.py) | ✅ | httpx+asyncio 并发压测，测 TTFT/TPOT/吞吐 |
+| 5 | [deploy/eagle3_draft.md](../deploy/eagle3_draft.md) | ✅ | EAGLE-3 原理与接入指引，含自训 draft 方案 |
+| 6 | [eval/perf_report.md](../eval/perf_report.md) | ✅ | benchmark 报告模板（等实机追写）|
+| 7 | [scripts/run_perf_benchmark.sh](../scripts/run_perf_benchmark.sh) | ✅ | **一键四档对比**：自动启停 vLLM + 压测 |
 
 ### 设计亮点（面试讲解点）
 
@@ -197,15 +197,15 @@ baseline  (vLLM V1 BF16)               : ~2800 tok/s, TTFT 120ms   1.00×
 
 | # | 文件 | 状态 | 亮点 |
 |---|------|------|------|
-| 1 | [scripts/quantize_gguf.sh](scripts/quantize_gguf.sh) | ✅ 已完整 | 4 精度批量量化（Q4_K_M / IQ4_XS / Q4_K_S / Q2_K） |
-| 2 | [deploy/Modelfile](deploy/Modelfile) + [deploy/llamacpp_server.sh](deploy/llamacpp_server.sh) | ✅ 已完整 | Ollama + llama.cpp CPU AMX 部署 |
-| 3 | [deploy/executorch/export_android_xnn.py](deploy/executorch/export_android_xnn.py) | ✅ 升级 | **从占位补完整**：XNNPACK INT4/INT8 + SDPA-KVCache |
-| 4 | [deploy/executorch/export_ios_coreml.py](deploy/executorch/export_ios_coreml.py) | ✅ 升级 | **从占位补完整**：CoreML A17 ANE + 4 档 compute_unit |
-| 5 | [deploy/qnn/convert.sh](deploy/qnn/convert.sh) | ✅ 升级 | **从占位补完整**：HF→ONNX→DLC→HTP 四步转换 |
-| 6 | [deploy/mlc/README.md](deploy/mlc/README.md) + [deploy/mlc/compile.sh](deploy/mlc/compile.sh) | ✅ 新建 | 一键编译 Android/iOS/WebGPU/Windows |
-| 7 | [deploy/benchmark_edge.py](deploy/benchmark_edge.py) | ✅ 新建 | 三后端（ollama/llamacpp/openai）TTFT+tok/s 压测 |
-| 8 | [deploy/edge_deployment_matrix.md](deploy/edge_deployment_matrix.md) | ✅ 新建 | **面试速查表**：5 种端侧方案对比 + 游戏业务推荐矩阵 |
-| 9 | [scripts/run_edge_pipeline.sh](scripts/run_edge_pipeline.sh) | ✅ 新建 | 端侧流水线：量化→Ollama→benchmark |
+| 1 | [scripts/quantize_gguf.sh](../scripts/quantize_gguf.sh) | ✅ 已完整 | 4 精度批量量化（Q4_K_M / IQ4_XS / Q4_K_S / Q2_K） |
+| 2 | [deploy/Modelfile](../deploy/Modelfile) + [deploy/llamacpp_server.sh](../deploy/llamacpp_server.sh) | ✅ 已完整 | Ollama + llama.cpp CPU AMX 部署 |
+| 3 | [deploy/executorch/export_android_xnn.py](../deploy/executorch/export_android_xnn.py) | ✅ 升级 | **从占位补完整**：XNNPACK INT4/INT8 + SDPA-KVCache |
+| 4 | [deploy/executorch/export_ios_coreml.py](../deploy/executorch/export_ios_coreml.py) | ✅ 升级 | **从占位补完整**：CoreML A17 ANE + 4 档 compute_unit |
+| 5 | [deploy/qnn/convert.sh](../deploy/qnn/convert.sh) | ✅ 升级 | **从占位补完整**：HF→ONNX→DLC→HTP 四步转换 |
+| 6 | [deploy/mlc/README.md](../deploy/mlc/README.md) + [deploy/mlc/compile.sh](../deploy/mlc/compile.sh) | ✅ 新建 | 一键编译 Android/iOS/WebGPU/Windows |
+| 7 | [deploy/benchmark_edge.py](../deploy/benchmark_edge.py) | ✅ 新建 | 三后端（ollama/llamacpp/openai）TTFT+tok/s 压测 |
+| 8 | [deploy/edge_deployment_matrix.md](../deploy/edge_deployment_matrix.md) | ✅ 新建 | **面试速查表**：5 种端侧方案对比 + 游戏业务推荐矩阵 |
+| 9 | [scripts/run_edge_pipeline.sh](../scripts/run_edge_pipeline.sh) | ✅ 新建 | 端侧流水线：量化→Ollama→benchmark |
 
 ### 设计亮点（面试讲解点）
 
@@ -243,13 +243,13 @@ baseline  (vLLM V1 BF16)               : ~2800 tok/s, TTFT 120ms   1.00×
 
 | # | 文件 | 类型 | 作用 |
 |---|------|------|------|
-| 1 | [configs/knowledge_rag.yaml](configs/knowledge_rag.yaml) | 配置 | 检索器+生成模型+Prompt+服务+观测一体配置，支持 `${VAR:-default}` 环境变量 |
-| 2 | [scripts/build_index.py](scripts/build_index.py) | 构建 | Qdrant 向量索引构建，支持 md/txt/jsonl + 增量 ID 稳定 UUID |
-| 3 | [deploy/rag_serve.py](deploy/rag_serve.py) | 服务 | FastAPI RAG：BGE-M3 dense 检索 → BGE-Reranker 精排 → vLLM 生成 + citations；兼容 OpenAI `/v1/chat/completions`；带 stream + fallback |
-| 4 | [deploy/mcp_expert_server.py](deploy/mcp_expert_server.py) | 服务 | FastMCP 封装：向 Agent 暴露 `knowledge_expert_query` + `knowledge_expert_health` 两个工具 |
-| 5 | [deploy/rag_docker-compose.yaml](deploy/rag_docker-compose.yaml) + [deploy/Dockerfile.rag](deploy/Dockerfile.rag) | 部署 | Qdrant + vLLM + rag_serve + mcp_expert 四件套一键编排 |
-| 6 | [scripts/run_rag_pipeline.sh](scripts/run_rag_pipeline.sh) | 脚本 | 本地一键启动：docker → 构建索引 → 启服务 → 自测；`SMOKE=1` 可自动造 KB |
-| 7 | [docs/agent_integration.md](docs/agent_integration.md) | 文档 | **面试讲解资料**：端到端架构图 + 三步接入 + 验证 curl + 面试话术 |
+| 1 | [configs/knowledge_rag.yaml](../configs/knowledge_rag.yaml) | 配置 | 检索器+生成模型+Prompt+服务+观测一体配置，支持 `${VAR:-default}` 环境变量 |
+| 2 | [scripts/build_index.py](../scripts/build_index.py) | 构建 | Qdrant 向量索引构建，支持 md/txt/jsonl + 增量 ID 稳定 UUID |
+| 3 | [deploy/rag_serve.py](../deploy/rag_serve.py) | 服务 | FastAPI RAG：BGE-M3 dense 检索 → BGE-Reranker 精排 → vLLM 生成 + citations；兼容 OpenAI `/v1/chat/completions`；带 stream + fallback |
+| 4 | [deploy/mcp_expert_server.py](../deploy/mcp_expert_server.py) | 服务 | FastMCP 封装：向 Agent 暴露 `knowledge_expert_query` + `knowledge_expert_health` 两个工具 |
+| 5 | [deploy/rag_docker-compose.yaml](../deploy/rag_docker-compose.yaml) + [deploy/Dockerfile.rag](../deploy/Dockerfile.rag) | 部署 | Qdrant + vLLM + rag_serve + mcp_expert 四件套一键编排 |
+| 6 | [scripts/run_rag_pipeline.sh](../scripts/run_rag_pipeline.sh) | 脚本 | 本地一键启动：docker → 构建索引 → 启服务 → 自测；`SMOKE=1` 可自动造 KB |
+| 7 | [docs/agent_integration.md](agent_integration.md) | 文档 | **面试讲解资料**：端到端架构图 + 三步接入 + 验证 curl + 面试话术 |
 
 ### 设计亮点（面试讲解点）
 
@@ -303,15 +303,15 @@ curl -X POST http://localhost:8100/rag/query \
 
 | # | 文件 | 类型 | 作用 |
 |---|------|------|------|
-| 1 | [observability/langfuse_tracing.py](observability/langfuse_tracing.py) | 工具 | 统一 Langfuse 埋点：`observe_rag` / `observe_train` / `trace_scope`，未配置时 no-op |
-| 2 | [deploy/rag_serve.py](deploy/rag_serve.py) | 改造 | 接入 Langfuse trace + Prometheus metrics，新增 `/metrics` 端点 |
-| 3 | [observability/prometheus.yml](observability/prometheus.yml) | 配置 | 抓 rag_serve / vLLM / Qdrant 三路指标 |
-| 4 | [observability/grafana_dashboard.json](observability/grafana_dashboard.json) | 面板 | 8 面板：QPS / P95 延迟 / 错误率 / KV-cache / token 吞吐 / citation 分布 |
-| 5 | [observability/docker-compose.obs.yaml](observability/docker-compose.obs.yaml) | 部署 | Langfuse + Postgres + Prometheus + Grafana 一键编排 |
+| 1 | [observability/langfuse_tracing.py](../observability/langfuse_tracing.py) | 工具 | 统一 Langfuse 埋点：`observe_rag` / `observe_train` / `trace_scope`，未配置时 no-op |
+| 2 | [deploy/rag_serve.py](../deploy/rag_serve.py) | 改造 | 接入 Langfuse trace + Prometheus metrics，新增 `/metrics` 端点 |
+| 3 | [observability/prometheus.yml](../observability/prometheus.yml) | 配置 | 抓 rag_serve / vLLM / Qdrant 三路指标 |
+| 4 | [observability/grafana_dashboard.json](../observability/grafana_dashboard.json) | 面板 | 8 面板：QPS / P95 延迟 / 错误率 / KV-cache / token 吞吐 / citation 分布 |
+| 5 | [observability/docker-compose.obs.yaml](../observability/docker-compose.obs.yaml) | 部署 | Langfuse + Postgres + Prometheus + Grafana 一键编排 |
 | 6 | observability/grafana_provisioning/ | 配置 | Grafana datasource + dashboard 自动 provisioning |
-| 7 | [scripts/run_observability.sh](scripts/run_observability.sh) | 脚本 | 一键启动观测栈 + 等待就绪 + 打印入口 |
-| 8 | [demo/demo_notebook.ipynb](demo/demo_notebook.ipynb) | Demo | 7 段 Jupyter 交互式演示，mock 模式也可跑通 |
-| 9 | [demo/demo_script.md](demo/demo_script.md) | 文档 | **3 分钟面试视频逐字稿** + 时间分布 + 高频追问备答 |
+| 7 | [scripts/run_observability.sh](../scripts/run_observability.sh) | 脚本 | 一键启动观测栈 + 等待就绪 + 打印入口 |
+| 8 | [demo/demo_notebook.ipynb](../demo/demo_notebook.ipynb) | Demo | 7 段 Jupyter 交互式演示，mock 模式也可跑通 |
+| 9 | [demo/demo_script.md](../demo/demo_script.md) | 文档 | **3 分钟面试视频逐字稿** + 时间分布 + 高频追问备答 |
 | 10 | [INTERVIEW.md](INTERVIEW.md) | 文档 | **项目速查卡**：架构 / 选型 / 指标 / 踩坑 / 追问 |
 
 ### 亮点（面试讲解点）
@@ -371,28 +371,28 @@ curl -X POST http://localhost:8100/rag/query \
 
 | # | 文件 | 类型 | 亮点 |
 |---|------|------|------|
-| 1 | [infra/README.md](infra/README.md) | 入口文档 | 三大板块总览 + 快速开始 |
-| 2 | [infra/cuda/triton_rmsnorm.py](infra/cuda/triton_rmsnorm.py) | 代码 | 手写 Triton RMSNorm 融合算子，2.2x 加速，HBM 带宽 99% |
-| 3 | [infra/cuda/flash_attn_bench.py](infra/cuda/flash_attn_bench.py) | 代码 | FA2 vs Naive 对比：6.7x 速度 / 32x 显存 |
-| 4 | [infra/cuda/profile_rmsnorm.sh](infra/cuda/profile_rmsnorm.sh) | 脚本 | Nsight Compute 硬件指标抓取 |
-| 5 | [infra/cuda/cuda_notes.md](infra/cuda/cuda_notes.md) | 文档 | CUDA 内存层次 + 算子优化四板斧 + 面试知识地图 |
-| 6 | [infra/distributed/ddp_fsdp_demo.py](infra/distributed/ddp_fsdp_demo.py) | 代码 | DDP/FSDP/FSDP+CPU Offload 三模式，CPU/GPU 均可跑 |
-| 7 | [infra/distributed/tp_column_row.py](infra/distributed/tp_column_row.py) | 代码 | 手写 Column/Row Parallel Linear，演示 TP 通信 |
-| 8 | [infra/distributed/mixed_precision_demo.py](infra/distributed/mixed_precision_demo.py) | 代码 | BF16 + GradCkpt + Liger + FA 组合显存实测 |
-| 9 | [infra/distributed/ds_zero2.json](infra/distributed/ds_zero2.json) | 配置 | DeepSpeed ZeRO-2 + optim offload |
-| 10 | [infra/distributed/ds_zero3.json](infra/distributed/ds_zero3.json) | 配置 | DeepSpeed ZeRO-3 + 全量 offload |
-| 11 | [infra/distributed/run_ddp_fsdp.sh](infra/distributed/run_ddp_fsdp.sh) | 脚本 | 一键 torchrun 启动五种模式 |
-| 12 | [infra/distributed/parallelism_matrix.md](infra/distributed/parallelism_matrix.md) | 文档 | 九大并行策略对照表（面试必背）|
-| 13 | [infra/inference/bench_speculative.py](infra/inference/bench_speculative.py) | 代码 | EAGLE-3 并发压测，支持任意 OpenAI 兼容 endpoint |
-| 14 | [infra/inference/pd_disagg_design.md](infra/inference/pd_disagg_design.md) | 文档 | Prefill/Decode 分离架构设计 + vLLM 启动配置 |
-| 15 | [infra/inference/profile_vllm.sh](infra/inference/profile_vllm.sh) | 脚本 | Prometheus metrics + Nsight Systems 抓时间线 |
-| 16 | [infra/inference/engine_selection.md](infra/inference/engine_selection.md) | 文档 | 9 大推理引擎选型矩阵（决策树）|
-| 17 | [infra/reports/rmsnorm_perf.md](infra/reports/rmsnorm_perf.md) | 报告 | Triton RMSNorm 性能数据 + Nsight 解读 |
-| 18 | [infra/reports/flash_attn_perf.md](infra/reports/flash_attn_perf.md) | 报告 | FlashAttention 基准数据 + 版本演进 |
-| 19 | [infra/reports/distributed_mem.md](infra/reports/distributed_mem.md) | 报告 | DDP/FSDP/ZeRO 显存对比表 |
-| 20 | [infra/reports/speculative_perf.md](infra/reports/speculative_perf.md) | 报告 | 四档 vLLM 压测 + EAGLE-3 调优参数 |
-| 21 | [infra/reports/infra_interview_cheatsheet.md](infra/reports/infra_interview_cheatsheet.md) | 速查卡 | 5 大面试高频问题话术 + 串联版 1 分钟自我介绍 |
-| 22 | [eval/ai_infra_report.md](eval/ai_infra_report.md) | 总报告 | 章节交付清单 + 核心产出 + 与主链路结合点 |
+| 1 | [infra/README.md](../infra/README.md) | 入口文档 | 三大板块总览 + 快速开始 |
+| 2 | [infra/cuda/triton_rmsnorm.py](../infra/cuda/triton_rmsnorm.py) | 代码 | 手写 Triton RMSNorm 融合算子，2.2x 加速，HBM 带宽 99% |
+| 3 | [infra/cuda/flash_attn_bench.py](../infra/cuda/flash_attn_bench.py) | 代码 | FA2 vs Naive 对比：6.7x 速度 / 32x 显存 |
+| 4 | [infra/cuda/profile_rmsnorm.sh](../infra/cuda/profile_rmsnorm.sh) | 脚本 | Nsight Compute 硬件指标抓取 |
+| 5 | [infra/cuda/cuda_notes.md](../infra/cuda/cuda_notes.md) | 文档 | CUDA 内存层次 + 算子优化四板斧 + 面试知识地图 |
+| 6 | [infra/distributed/ddp_fsdp_demo.py](../infra/distributed/ddp_fsdp_demo.py) | 代码 | DDP/FSDP/FSDP+CPU Offload 三模式，CPU/GPU 均可跑 |
+| 7 | [infra/distributed/tp_column_row.py](../infra/distributed/tp_column_row.py) | 代码 | 手写 Column/Row Parallel Linear，演示 TP 通信 |
+| 8 | [infra/distributed/mixed_precision_demo.py](../infra/distributed/mixed_precision_demo.py) | 代码 | BF16 + GradCkpt + Liger + FA 组合显存实测 |
+| 9 | [infra/distributed/ds_zero2.json](../infra/distributed/ds_zero2.json) | 配置 | DeepSpeed ZeRO-2 + optim offload |
+| 10 | [infra/distributed/ds_zero3.json](../infra/distributed/ds_zero3.json) | 配置 | DeepSpeed ZeRO-3 + 全量 offload |
+| 11 | [infra/distributed/run_ddp_fsdp.sh](../infra/distributed/run_ddp_fsdp.sh) | 脚本 | 一键 torchrun 启动五种模式 |
+| 12 | [infra/distributed/parallelism_matrix.md](../infra/distributed/parallelism_matrix.md) | 文档 | 九大并行策略对照表（面试必背）|
+| 13 | [infra/inference/bench_speculative.py](../infra/inference/bench_speculative.py) | 代码 | EAGLE-3 并发压测，支持任意 OpenAI 兼容 endpoint |
+| 14 | [infra/inference/pd_disagg_design.md](../infra/inference/pd_disagg_design.md) | 文档 | Prefill/Decode 分离架构设计 + vLLM 启动配置 |
+| 15 | [infra/inference/profile_vllm.sh](../infra/inference/profile_vllm.sh) | 脚本 | Prometheus metrics + Nsight Systems 抓时间线 |
+| 16 | [infra/inference/engine_selection.md](../infra/inference/engine_selection.md) | 文档 | 9 大推理引擎选型矩阵（决策树）|
+| 17 | [infra/reports/rmsnorm_perf.md](../infra/reports/rmsnorm_perf.md) | 报告 | Triton RMSNorm 性能数据 + Nsight 解读 |
+| 18 | [infra/reports/flash_attn_perf.md](../infra/reports/flash_attn_perf.md) | 报告 | FlashAttention 基准数据 + 版本演进 |
+| 19 | [infra/reports/distributed_mem.md](../infra/reports/distributed_mem.md) | 报告 | DDP/FSDP/ZeRO 显存对比表 |
+| 20 | [infra/reports/speculative_perf.md](../infra/reports/speculative_perf.md) | 报告 | 四档 vLLM 压测 + EAGLE-3 调优参数 |
+| 21 | [infra/reports/infra_interview_cheatsheet.md](../infra/reports/infra_interview_cheatsheet.md) | 速查卡 | 5 大面试高频问题话术 + 串联版 1 分钟自我介绍 |
+| 22 | [eval/ai_infra_report.md](../eval/ai_infra_report.md) | 总报告 | 章节交付清单 + 核心产出 + 与主链路结合点 |
 
 ### 三大板块核心产出
 

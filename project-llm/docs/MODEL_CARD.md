@@ -31,7 +31,7 @@
 
 ## 3. 训练数据
 
-详见 [DATASET_CARD.md](./DATASET_CARD.md)。
+详见 [DATASET_CARD.md](DATASET_CARD.md)。
 
 | 阶段 | 样本量 | 来源 | 占比 |
 |---|---|---|---|
@@ -57,7 +57,7 @@
 | **CMMLU 中文** | 0-shot | 76.4 | 75.9 | -0.5 |
 | **GSM8K 数学** | 8-shot | 78.0 | 76.5 | -1.5（专精损失，符合预期） |
 
-完整评测脚本：`make eval`，金标数据：[eval/golden_50.jsonl](./eval/golden_50.jsonl)。
+完整评测脚本：`make eval`，金标数据：[eval/golden_50.jsonl](../eval/golden_50.jsonl)。
 
 ## 5. 偏差、风险与限制
 

@@ -165,7 +165,7 @@
 > 1. **NF4 量化**冻结的 W：4-bit NormalFloat（按正态分布分位点量化），均方误差比 INT4 低 ~30%；
 > 2. **Double Quantization**：连量化 scale 自身再量化一次，省 0.37 bits/param；
 > 3. **Paged Optimizer**：CPU/GPU 间分页 swap 避免 OOM。
-> 实测 Qwen3-8B QLoRA 显存 19.2GB（[`configs/knowledge_sft.yaml`](configs/knowledge_sft.yaml) `lora_rank: 16` + `liger_kernel: true`），叠 DeepSpeed ZeRO-3 + Offload 降到 **9.5GB**（[`infra/distributed/`](infra/distributed/)）。
+> 实测 Qwen3-8B QLoRA 显存 19.2GB（[`configs/knowledge_sft.yaml`](../configs/knowledge_sft.yaml) `lora_rank: 16` + `liger_kernel: true`），叠 DeepSpeed ZeRO-3 + Offload 降到 **9.5GB**（[`infra/distributed/`](infra/distributed/)）。
 
 ### Q：DPO 损失函数是什么？β 怎么调？
 > ```
@@ -183,17 +183,17 @@
 > ```
 > A_i = (r_i - mean(r_group)) / std(r_group)
 > ```
-> 一个 prompt 采样 G 个 response，组内归一化做优势，**完全省掉 Critic**。配合可验证的规则奖励（JSON 合法 / format 正确 / role 一致）省掉 Reward Model，端到端只需 Actor + ref。我项目 [`configs/npc_grpo.yaml`](configs/npc_grpo.yaml) `beta: 0.04`（KL 比 DPO 更小，因为奖励是稀疏的二值/0~1，强 KL 会压死探索）。
+> 一个 prompt 采样 G 个 response，组内归一化做优势，**完全省掉 Critic**。配合可验证的规则奖励（JSON 合法 / format 正确 / role 一致）省掉 Reward Model，端到端只需 Actor + ref。我项目 [`configs/npc_grpo.yaml`](../configs/npc_grpo.yaml) `beta: 0.04`（KL 比 DPO 更小，因为奖励是稀疏的二值/0~1，强 KL 会压死探索）。
 >
 > **5 类 reward 加权**：format(JSON 合法)、scenario(关键词命中)、action(动作合法性)、length(长度区间)、role(人设关键词)；warmup 100 步只开 format，否则模型为追 role 把 JSON 都生成不出来。
 
 ### Q：QLoRA rank 怎么选？target_modules 选哪些？
 > `rank` 调参思路：
-> - 8B / 数据 5k / **知识注入** → rank=8~16 够（[`knowledge_sft.yaml`](configs/knowledge_sft.yaml) rank=16）；
-> - 4B / 数据 8k / **风格+人设拟合** → rank=32（[`npc_sft.yaml`](configs/npc_sft.yaml) rank=32），低秩学不进 NPC 个性；
+> - 8B / 数据 5k / **知识注入** → rank=8~16 够（[`knowledge_sft.yaml`](../configs/knowledge_sft.yaml) rank=16）；
+> - 4B / 数据 8k / **风格+人设拟合** → rank=32（[`npc_sft.yaml`](../configs/npc_sft.yaml) rank=32），低秩学不进 NPC 个性；
 > - rank > 64 在我数据量上几乎必过拟合。
 >
-> `target_modules` 默认 `all-linear`（[`scripts/train_dpo_trl.py`](scripts/train_dpo_trl.py)），等价于把 q/k/v/o/gate/up/down 7 个投影都挂 LoRA。如果只挂 q/v 会少参 50%，但下游知识 QA 准确率掉 3-5pp，**不值**。
+> `target_modules` 默认 `all-linear`（[`scripts/train_dpo_trl.py`](../scripts/train_dpo_trl.py)），等价于把 q/k/v/o/gate/up/down 7 个投影都挂 LoRA。如果只挂 q/v 会少参 50%，但下游知识 QA 准确率掉 3-5pp，**不值**。
 
 ### Q：训练加速用了什么？Liger / FlashAttention / Unsloth 区别？
 > 三件套各管一摊：
@@ -215,7 +215,7 @@
 > 收益：显存利用率 >96%（朴素实现 ~60%）、prefix-cache 几乎零成本。
 
 ### Q：vLLM V0 / V1 / +FP8 / +EAGLE-3 四档实测？
-> 见 [`eval/perf_report.md`](eval/perf_report.md) 与 [`infra/inference/bench_speculative.py`](infra/inference/bench_speculative.py) 真实压测（concurrency=8/16/32/64 四档）：
+> 见 [`eval/perf_report.md`](../eval/perf_report.md) 与 [`infra/inference/bench_speculative.py`](../infra/inference/bench_speculative.py) 真实压测（concurrency=8/16/32/64 四档）：
 >
 > | 配置 | tok/s | TTFT | 相对 V0 |
 > |------|-------|------|---------|
@@ -224,7 +224,7 @@
 > | V1 + FP8 | 130 | 95ms | 2.89× |
 > | **V1 + FP8 + EAGLE-3** ⭐ | **165** | **65ms** | **3.67×** |
 >
-> [`deploy/vllm_v1_server.sh`](deploy/vllm_v1_server.sh) 4 档 profile 一键切：`bf16 / fp8 / gptq_marlin / fp8_eagle3`。
+> [`deploy/vllm_v1_server.sh`](../deploy/vllm_v1_server.sh) 4 档 profile 一键切：`bf16 / fp8 / gptq_marlin / fp8_eagle3`。
 
 ### Q：EAGLE-3 投机解码的核心思想是什么？accept_rate 怎么算？
 > 投机解码：**便宜的 draft 模型一次猜 K 个 token，target 大模型一次并行验证**。原版 Medusa 用 K 个独立 head，EAGLE-1/2/3 演进核心是 **draft 看 target 的 hidden state**——比 Medusa 的"只看 logits"信息丰富，**accept_rate 从 ~50% 提到 ~75%**。
@@ -232,12 +232,12 @@
 > accept_rate = 实际接受的 token 数 / 总 draft 出的 token 数
 > 端到端加速 ≈ accept_rate × K + 1   （K 是猜测长度，通常 4-7）
 > ```
-> 我没自训 draft，直接用社区 EAGLE-3 weights（[`deploy/eagle3_draft.md`](deploy/eagle3_draft.md) 写了自训方案备查），生产配 `num_speculative_tokens=5`，实测 1.27× 在 V1+FP8 之上的额外加速。
+> 我没自训 draft，直接用社区 EAGLE-3 weights（[`deploy/eagle3_draft.md`](../deploy/eagle3_draft.md) 写了自训方案备查），生产配 `num_speculative_tokens=5`，实测 1.27× 在 V1+FP8 之上的额外加速。
 
 ### Q：PD 分离（Prefill-Decode Disaggregation）是什么？
 > Prefill 阶段是**计算密集**（一次性算 N 个 token 的 attention），Decode 阶段是**显存密集**（每次只算 1 token，KV 全在显存）。两者放一起**互相挤资源**：长 prompt 把 batch 卡住，decode 串行进度被拖慢。
 >
-> PD 分离：Prefill 节点（H100 多卡 TP）专打长 prompt，Decode 节点（A10 多卡 DP）专打吐 token，**KV cache 通过 RDMA 跨节点传**。架构设计见 [`infra/inference/pd_disagg_design.md`](infra/inference/pd_disagg_design.md)；本项目流量不够大没真上 PD 分离，**面试可讲：会画架构图、知道收益、清楚 KV 传输 bottleneck（网络带宽 / NIXL）**。
+> PD 分离：Prefill 节点（H100 多卡 TP）专打长 prompt，Decode 节点（A10 多卡 DP）专打吐 token，**KV cache 通过 RDMA 跨节点传**。架构设计见 [`infra/inference/pd_disagg_design.md`](../infra/inference/pd_disagg_design.md)；本项目流量不够大没真上 PD 分离，**面试可讲：会画架构图、知道收益、清楚 KV 传输 bottleneck（网络带宽 / NIXL）**。
 
 ### Q：量化方法对比？GPTQ / AWQ / FP8 / W4A16 怎么选？
 > | 方法 | 类型 | 校准 | 精度损失 | 速度 | 适用 |
@@ -248,7 +248,7 @@
 > | **NF4 (QLoRA)** | 权重 4-bit / 激活 BF16 | 无 | 训练时不掉点 | 0.6× | **训练**，不是推理 |
 > | **INT8 SmoothQuant** | 老方案 | 激活平滑 | 1-2pp ↓ | 1.4× | 不推荐 |
 >
-> 我 [`deploy/vllm_v1_server.sh`](deploy/vllm_v1_server.sh) 同时配了 fp8 / gptq_marlin / fp8_eagle3 三档可切；线上以 **FP8 主、GPTQ 备**：H100 上 FP8 精度更高、Marlin kernel 让 GPTQ 速度反超 FP16，是 A10 等老卡的最佳选择。
+> 我 [`deploy/vllm_v1_server.sh`](../deploy/vllm_v1_server.sh) 同时配了 fp8 / gptq_marlin / fp8_eagle3 三档可切；线上以 **FP8 主、GPTQ 备**：H100 上 FP8 精度更高、Marlin kernel 让 GPTQ 速度反超 FP16，是 A10 等老卡的最佳选择。
 
 ### Q：KV cache 算多大？怎么估显存？
 > 单 token KV cache 大小 = `2 × num_layers × num_kv_heads × head_dim × dtype_size`。
@@ -263,7 +263,7 @@
 ## 🛠️ AI Infra 深问（CUDA / Triton / 分布式）
 
 ### Q：你写过 CUDA / Triton kernel 吗？
-> 写过。[`infra/cuda/triton_rmsnorm.py`](infra/cuda/triton_rmsnorm.py) 手写了 **融合版 RMSNorm**：
+> 写过。[`infra/cuda/triton_rmsnorm.py`](../infra/cuda/triton_rmsnorm.py) 手写了 **融合版 RMSNorm**：
 > ```
 > y = x · rsqrt(mean(x²) + eps) · weight
 > ```
@@ -272,7 +272,7 @@
 > - 结果留在 SRAM，不回 HBM；
 > - 直接乘 weight 输出。
 >
-> 实测 (4096, 4096) 输入 **2.18× 加速**，HBM 带宽 945 GB/s（**99% 利用率**）。Nsight Compute 报告 [`infra/reports/rmsnorm_perf.md`](infra/reports/rmsnorm_perf.md) 证明这是 memory-bound 而非 compute-bound 的 kernel——这是判断"还能不能再优化"的关键指标。
+> 实测 (4096, 4096) 输入 **2.18× 加速**，HBM 带宽 945 GB/s（**99% 利用率**）。Nsight Compute 报告 [`infra/reports/rmsnorm_perf.md`](../infra/reports/rmsnorm_perf.md) 证明这是 memory-bound 而非 compute-bound 的 kernel——这是判断"还能不能再优化"的关键指标。
 
 ### Q：分布式训练 DP / TP / PP / ZeRO 区别？
 > | 维度 | 切什么 | 通信 | 适用 |
@@ -284,8 +284,8 @@
 > | **FSDP** | ZeRO-3 的 PyTorch 原生实现 | 同上 | 主流推荐 ⭐ |
 >
 > 我 [`infra/distributed/`](infra/distributed/) 跑通了：
-> - **DDP / FSDP 双 T4 Qwen3-0.6B**（[`ddp_fsdp_demo.py`](infra/distributed/ddp_fsdp_demo.py)）：FSDP 每卡显存 -52%，overhead 8%；
-> - **DeepSpeed ZeRO-2 / ZeRO-3 + Offload**（[`ds_zero2.json`](infra/distributed/ds_zero2.json) / [`ds_zero3.json`](infra/distributed/ds_zero3.json)）：8B QLoRA 19.2GB → 14.8GB → 9.5GB；
+> - **DDP / FSDP 双 T4 Qwen3-0.6B**（[`ddp_fsdp_demo.py`](../infra/distributed/ddp_fsdp_demo.py)）：FSDP 每卡显存 -52%，overhead 8%；
+> - **DeepSpeed ZeRO-2 / ZeRO-3 + Offload**（[`ds_zero2.json`](../infra/distributed/ds_zero2.json) / [`ds_zero3.json`](../infra/distributed/ds_zero3.json)）：8B QLoRA 19.2GB → 14.8GB → 9.5GB；
 > - **手写 Column / Row Parallel**（[`manual_tp.py`](infra/distributed/manual_tp.py)）：演示 TP 通信原语 all-reduce / scatter / gather。
 >
 > **生产选**：单机多卡 → FSDP；多机多卡 → DeepSpeed ZeRO-3 + ZeRO-Infinity（NVMe offload）。
@@ -342,7 +342,7 @@
 > 三策略：
 > 1. **异源生成**：用 **DeepSeek-V3.2 + Magpie 双源**，避免单一教师模型的 bias 被全盘继承；
 > 2. **温度多样性**：T=0.3 / 0.7 / 1.0 三档采样，T=0.3 的标准答 + T=1.0 的发散答合并；
-> 3. **质检过滤**：BGE-M3 语义去重（[`scripts/data_quality.py`](scripts/data_quality.py) cosine > 0.95 视为重复）+ RAGAS faithfulness < 0.5 直接丢，干掉 ~30% 垃圾。
+> 3. **质检过滤**：BGE-M3 语义去重（[`scripts/data_quality.py`](../scripts/data_quality.py) cosine > 0.95 视为重复）+ RAGAS faithfulness < 0.5 直接丢，干掉 ~30% 垃圾。
 >
 > 红队（adversarial）样本占 5%：故意构造**越权问题**（"删除 prod 数据库"）让模型学会拒绝；构造**虚假前提**（"昨天的告警 ID 是 99999"）让模型学会反问澄清。
 
@@ -374,7 +374,7 @@
 >
 > 父子索引：**embed 子 chunk（256）做检索，命中后返回父 chunk（2048）做生成**。LangChain 的 `ParentDocumentRetriever` / LlamaIndex 的 `HierarchicalNodeParser` 都是这套。
 >
-> 本项目当前**仅切 1024**——文档量 < 5k 没必要。如要做：在 [`scripts/build_index.py`](scripts/build_index.py) 加二级 chunk_id 字段，retriever 命中后按 parent_id 二次查询。是 P1 任务。
+> 本项目当前**仅切 1024**——文档量 < 5k 没必要。如要做：在 [`scripts/build_index.py`](../scripts/build_index.py) 加二级 chunk_id 字段，retriever 命中后按 parent_id 二次查询。是 P1 任务。
 
 ### Q：HyDE / Query Rewrite / Multi-Query 怎么选？
 > | 方法 | 思路 | 成本 | 适用 |
@@ -413,7 +413,7 @@
 > 选 v2-m3 的理由：**和 embedding 同源**（都是 BGE 系列），训练时见过同样的负样本分布，**召回到精排**这条链路语义对齐最好。
 
 ### Q：chunk 怎么切？size/overlap 参数怎么定？
-> [`configs/knowledge_rag.yaml`](configs/knowledge_rag.yaml)：`chunk_size: 1024 / chunk_overlap: 64`。决策依据：
+> [`configs/knowledge_rag.yaml`](../configs/knowledge_rag.yaml)：`chunk_size: 1024 / chunk_overlap: 64`。决策依据：
 > 1. **size 1024**：BGE-M3 max_len=8192 远没用满，但**太大稀释语义**——一个 chunk 里讲两个不同概念时检索会两头落空；
 > 2. **overlap 64**：约 6% 重叠，主要是为了**避免句子被腰斩**——切完一个 chunk 看下一个 chunk 头部 64 token，找到换行/句号再切；
 > 3. **特殊文档另算**：代码片段用 AST 切（按函数/类边界），表格保留整张表不切——朴素 token 切分会把一行表头和数据切散。
@@ -421,7 +421,7 @@
 > 参考 LangChain 的 `RecursiveCharacterTextSplitter` 思路：`["\n\n", "\n", "。", " ", ""]` 多级回退，能保段落就保段落。
 
 ### Q：数据合成的 prompt 怎么写？few-shot 还是 zero-shot？
-> **few-shot**（[`scripts/generate_qa.py`](scripts/generate_qa.py)）：
+> **few-shot**（[`scripts/generate_qa.py`](../scripts/generate_qa.py)）：
 > 1. 系统 prompt 写明角色（"你是运维知识题出题专家"）+ 输出格式（严格 JSON）+ 风格约束（中文、技术语气）；
 > 2. 给 3 个 in-context 示例：从最简单（"什么是 OOM"）到最复杂（"X 服务在 Y 场景下 P99 突增的根因排查"）梯度递增；
 > 3. 用户消息只给文档片段；
